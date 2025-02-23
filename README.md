@@ -19,7 +19,7 @@ SNPs -> LDL-c -> Alzheimer's Disease Risk
 
 SNPs -> Serum Iodine > Alzheimer's Disease Risk
 
-### Data Mining (VCFs)
+### Data Mining (VCFs) -> UNIX/Bash
 Exposure GWAS data (LDL-c) -> https://gwas.mrcieu.ac.uk/datasets/ieu-b-110/
 
 Exposure GWAS data (Serum Iodine) -> N/A
@@ -27,9 +27,9 @@ Exposure GWAS data (Serum Iodine) -> N/A
 Outcome GWAS data -> https://gwas.mrcieu.ac.uk/datasets/ieu-b-5067/
 
 ### Data Cleaning and Pre-processing
--> Reformat VCFs -> CSV files
+-> Reformat VCFs -> CSV files (Python)
 
--> Clean Exposure and Outcome VCFs from INDELs (SQL)
+-> Clean Exposure and Outcome VCFs of any INDELs (SQL)
 
 ### Quality Control
 
