@@ -6,7 +6,7 @@ Christian Pepler - MRes Bioscience @Cardiff University
 
 Python / R / UNIX / SQL
 
-Bioinformatics 🧬 + Data Science 📈 + Neuroscience 🧠
+Bioinformatics 🧬 / Data Science 📈 / Neuroscience 🧠
 
 ## What is Mendelian Randomisation
 
