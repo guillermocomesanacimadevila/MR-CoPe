@@ -33,6 +33,6 @@ Outcome GWAS data -> https://gwas.mrcieu.ac.uk/datasets/ieu-b-5067/
 
 ### Quality Control
 
-### Model Building
+### Model Engineering
 
 ### Data Visualisation 
