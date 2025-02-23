@@ -28,6 +28,7 @@ Outcome GWAS data -> https://gwas.mrcieu.ac.uk/datasets/ieu-b-5067/
 
 ### Data Cleaning and Pre-processing
 -> Reformat VCFs -> CSV files
+
 -> Clean Exposure and Outcome VCFs from INDELs (SQL)
 
 ### Quality Control
