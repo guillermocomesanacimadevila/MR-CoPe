@@ -1,8 +1,7 @@
-# ==== Call libraries ==== #
-
 import os
 import csv
 import pandas as pd
+import numpy as np
 
 # ==== Function accumulator ==== #
 
@@ -54,10 +53,14 @@ df1.columns = ["Beta", "SE", "LP", "AF", "ID"]
 # Convert to numeric
 df1["Beta"] = pd.to_numeric(df1["Beta"], errors="coerce")
 df1["SE"] = pd.to_numeric(df1["SE"], errors="coerce")
+df1["LP"] = pd.to_numeric(df1["LP"], errors="coerce")
+
+# Add pval column -
+df1["P_VALUE"] = 10 ** (-df1["LP"])
 
 # add SNP id
 df1["SNP"] = exposure["ID"]
-# print(df1.head(n=5), f"Shape: {df1.shape}")
+print(df1.head(n=5), f"Shape: {df1.shape}")
 
 # ==== Outcome formatting ==== #
 df2 = outcome[column_name].str.split(":", expand=True)
@@ -66,10 +69,14 @@ df2.columns = ["Beta", "SE", "LP", "AF", "ID"]
 # Convert to numeric
 df2["beta"] = pd.to_numeric(df2["Beta"], errors="coerce")
 df2["SE"] = pd.to_numeric(df2["SE"], errors="coerce")
+df2["LP"] = pd.to_numeric(df2["LP"], errors="coerce")
+
+# Add pval column -
+df2["P_VALUE"] = 10 ** (-df2["LP"])
 
 # Add SNP id
 df2["SNP"] = outcome["ID"]
-# print(df2.head(n=5), f"Shape: {df2.shape}")
+print(df2.head(n=5), f"Shape: {df2.shape}")
 
 df1.to_csv("~/cpep_MR/Cleaned Data/exp_stats.csv", index=False)
 df2.to_csv("~/cpep_MR/Cleaned Data/outcome_stats.csv", index=False)
