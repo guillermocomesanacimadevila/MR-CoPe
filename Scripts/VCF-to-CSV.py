@@ -86,4 +86,5 @@ print(df2.head(n=5), f"Shape: {df2.shape}")
 df1.to_csv("~/cpep_MR/Cleaned Data/exp_stats.csv", index=False)
 df2.to_csv("~/cpep_MR/Cleaned Data/outcome_stats.csv", index=False)
 
+# Check column names of original VCF
 print(exposure.columns)
