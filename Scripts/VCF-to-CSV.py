@@ -46,7 +46,7 @@ outcome = read_file("~/cpep_MR/Cleaned Data/cleaned_outcome.csv")
 # Separate final columns to get (Beta, SE, etc...)
 column_name = "ieu-b-5067"
 
-# Exposure
+# ==== Exposure Formatting ==== #
 df1 = exposure[column_name].str.split(":", expand=True)
 df1.columns = ["Beta", "SE", "LP", "AF", "ID"]
 
@@ -55,28 +55,35 @@ df1["Beta"] = pd.to_numeric(df1["Beta"], errors="coerce")
 df1["SE"] = pd.to_numeric(df1["SE"], errors="coerce")
 df1["LP"] = pd.to_numeric(df1["LP"], errors="coerce")
 
-# Add pval column -
+# Compute p-value
 df1["P_VALUE"] = 10 ** (-df1["LP"])
 
-# add SNP id
+# Add SNP id and Position
 df1["SNP"] = exposure["ID"]
+df1["POS"] = exposure["POS"]  
+
 print(df1.head(n=5), f"Shape: {df1.shape}")
 
-# ==== Outcome formatting ==== #
+# ==== Outcome Formatting ==== #
 df2 = outcome[column_name].str.split(":", expand=True)
 df2.columns = ["Beta", "SE", "LP", "AF", "ID"]
 
 # Convert to numeric
-df2["beta"] = pd.to_numeric(df2["Beta"], errors="coerce")
+df2["Beta"] = pd.to_numeric(df2["Beta"], errors="coerce")
 df2["SE"] = pd.to_numeric(df2["SE"], errors="coerce")
 df2["LP"] = pd.to_numeric(df2["LP"], errors="coerce")
 
-# Add pval column -
+# Compute p-value
 df2["P_VALUE"] = 10 ** (-df2["LP"])
 
-# Add SNP id
+# Add SNP id and Position
 df2["SNP"] = outcome["ID"]
+df2["POS"] = outcome["POS"]
+
 print(df2.head(n=5), f"Shape: {df2.shape}")
 
+# Save updated DataFrames
 df1.to_csv("~/cpep_MR/Cleaned Data/exp_stats.csv", index=False)
 df2.to_csv("~/cpep_MR/Cleaned Data/outcome_stats.csv", index=False)
+
+print(exposure.columns)
