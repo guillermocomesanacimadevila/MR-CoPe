@@ -32,3 +32,5 @@ df_outcome = parse_csv("/Users/guillermocomesanacimadevila/Desktop/outcome.csv")
 
 print(df_exposure.head(n=5))
 print(common_snps(exposure, df_exposure))
+print(f"Number of common SNPs: {len((common_snps(exposure, df_exposure)))}") # 5780
+print(f"Total Number of SNPs Exposure: {df_exposure.shape[0]}, Total Number of SNPs Outcome: {df_outcome.shape[0]}") # 9640 vs 3169
