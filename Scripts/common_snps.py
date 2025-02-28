@@ -32,5 +32,23 @@ df_outcome = parse_csv("/Users/guillermocomesanacimadevila/Desktop/outcome.csv")
 
 print(df_exposure.head(n=5))
 print(common_snps(exposure, df_exposure))
-print(f"Number of common SNPs: {len((common_snps(exposure, df_exposure)))}") # 5780
-print(f"Total Number of SNPs Exposure: {df_exposure.shape[0]}, Total Number of SNPs Outcome: {df_outcome.shape[0]}") # 9640 vs 3169
+print(f"Number of common SNPs: {len((common_snps(exposure, df_exposure)))}")
+print(f"Total Number of SNPs Exposure: {df_exposure.shape[0]}, Total Number of SNPs Outcome: {df_outcome.shape[0]}")
+
+print(df_exposure.columns)
+print(df_outcome.columns)
+# need beta, ci, locations, pValue, riskAllele, mappedGenes, riskFrequency
+
+# exposure
+df = df_exposure[["riskAllele", "locations", "mappedGenes", "riskFrequency", "beta", "ci", "pValue"]]
+df2 = df_outcome[["riskAllele", "locations", "mappedGenes", "riskFrequency", "beta", "ci", "pValue"]]
+print(df.shape, df2.shape) # 7 cols each
+
+# renaming columns for clarity
+df = df.rename(columns={"riskAllele": "SNP", "locations": "Position", "mappedGenes": "Mapped Genes",
+                        "riskFrequency": "MAF", "beta": "Beta", "ci": "CI"})
+
+df2 = df2.rename(columns={"riskAllele": "SNP", "locations": "Position", "mappedGenes": "Mapped Genes",
+                          "riskFrequency": "MAF", "beta": "Beta", "ci": "CI"})
+
+# Go to SQL and merge dfs
