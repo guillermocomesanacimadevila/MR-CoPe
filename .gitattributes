@@ -1,2 +1,3 @@
-# Force GitHub to recognize .nf files as Nextflow
+# Force GitHub to recognize .nf files as Nextflow and SQL
 *.nf linguist-language=Nextflow
+*.sql linguist-language=SQL
