@@ -1,0 +1,2 @@
+# Force GitHub to recognize .nf files as Nextflow
+*.nf linguist-language=Nextflow
