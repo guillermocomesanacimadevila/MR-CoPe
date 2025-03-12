@@ -14,7 +14,7 @@ workflow {
     // Step 4: Perform MR Analyses (TwoSampleMR in R)
     mr_analysis()
 
-    // Step 5: Generate Visualizations
+    // Step 5: Generate Visualisations
     visualize_results()
 }
 
@@ -41,7 +41,7 @@ process exploratory_analysis {
 
     script:
     """
-    jupyter nbconvert --to notebook --execute 02_exploratory_analysis.ipynb
+    python 02_exploratory_analysis.py
     """
 }
 
@@ -72,8 +72,8 @@ process mr_analysis {
     """
 }
 
-process visualize_results {
-    tag 'Generating MR Visualizations'
+process visualise_results {
+    tag 'Generating MR Visualisations'
     input:
     path "MR_Formatted_Results.csv"
 
