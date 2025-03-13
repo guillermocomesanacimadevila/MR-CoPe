@@ -4,7 +4,7 @@ Guillermo Comesaña - MSc Bioinformatics @University of Bath
 
 Christian Pepler - MRes Bioscience @Cardiff University
 
-Python / R / UNIX / SQL
+Python / R / UNIX / SQL -> Nextflow
 
 Bioinformatics 🧬 / Data Science 📈 / Neuroscience 🧠
 
