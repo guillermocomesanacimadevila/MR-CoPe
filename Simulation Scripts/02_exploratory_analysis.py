@@ -4,6 +4,7 @@
 
 import os
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 
 def parse_gwas(location):
@@ -28,11 +29,14 @@ print(ad.isna().sum())
 df = ldl_c[["BP", "PVALUE", "CHR"]]
 df2 = ad[["BP", "PVALUE", "CHR"]]
 
-# Check for pval < 0.05
-plt.figure(figsize=(12, 6))
+# Transform pvalues to f(p) = -log10(p)
+df["-log10(PVALUE)"] = -np.log10(df["PVALUE"])
+df2["-log10(PVALUE)"] = -np.log10(df2["PVALUE"])
 
-# Exposure GWAS
-# Scatter plot with chromosome-based coloring
+# Set up the Manhattan plot -> Exposure
+plt.figure(figsize=(14, 6))
+
+# Define colors for alternating chromosomes
 chromosomes = df["CHR"].unique()
 colors = ["blue", "red"] * (len(chromosomes) // 2 + 1)
 
@@ -40,44 +44,59 @@ x_labels = []
 x_ticks = []
 x_offset = 0
 
+# Sort chromosomes for consistent plotting
 for i, chrom in enumerate(sorted(chromosomes)):
     subset = df[df["CHR"] == chrom]
-    plt.scatter(subset["BP"] + x_offset, subset["PVALUE"], color=colors[i % 2], s=10)
+    plt.scatter(subset["BP"] + x_offset, subset["-log10(PVALUE)"], color=colors[i % 2], s=10)
     x_labels.append(chrom)
     x_ticks.append(x_offset + (subset["BP"].max() - subset["BP"].min()) / 2)
     x_offset += subset["BP"].max() - subset["BP"].min() + 1
 
-plt.xticks(x_ticks, x_labels, rotation=90)
-plt.axhline(y=0.05, color="black", linestyle="--", label="P = 0.05")
-plt.title("Manhattan Plot (P-values)")
-plt.xlabel("Chromosome")
-plt.ylabel("P-value")
-plt.tight_layout()
+# Add genome-wide significance threshold line (-log10(5e-8) = 7.3)
+plt.axhline(y=-np.log10(5e-8), color="black", linestyle="--", label="Genome-wide significance (5e-8)")
 
+# Formatting
+plt.xticks(x_ticks, x_labels, rotation=90)
+plt.xlabel("Chromosome")
+plt.ylabel("-log10(P-value)")
+plt.title("Manhattan Plot of GWAS Results")
+plt.tight_layout()
+plt.legend()
+
+# Show plot
 plt.show()
 
-# Outcome GWAS
-plt.figure(figsize=(12, 6))
+# --- Outcome --- #
 
-chromosomes = df2["CHR"].unique()
+# Set up the Manhattan plot -> Outcome
+plt.figure(figsize=(14, 6))
+
+# Define colors for alternating chromosomes
+chromosomes = df["CHR"].unique()
 colors = ["blue", "red"] * (len(chromosomes) // 2 + 1)
 
 x_labels = []
 x_ticks = []
 x_offset = 0
 
+# Sort chromosomes for consistent plotting
 for i, chrom in enumerate(sorted(chromosomes)):
     subset = df2[df2["CHR"] == chrom]
-    plt.scatter(subset["BP"] + x_offset, subset["PVALUE"], color=colors[i % 2], s=10)
+    plt.scatter(subset["BP"] + x_offset, subset["-log10(PVALUE)"], color=colors[i % 2], s=10)
     x_labels.append(chrom)
     x_ticks.append(x_offset + (subset["BP"].max() - subset["BP"].min()) / 2)
     x_offset += subset["BP"].max() - subset["BP"].min() + 1
 
-plt.xticks(x_ticks, x_labels, rotation=90)
-plt.axhline(y=0.05, color="black", linestyle="--", label="P = 0.05")
-plt.title("Manhattan Plot (P-values)")
-plt.xlabel("Chromosome")
-plt.ylabel("P-value")
-plt.tight_layout()
+# Add genome-wide significance threshold line (-log10(5e-8) = 7.3)
+plt.axhline(y=-np.log10(5e-8), color="black", linestyle="--", label="Genome-wide significance (5e-8)")
 
+# Formatting
+plt.xticks(x_ticks, x_labels, rotation=90)
+plt.xlabel("Chromosome")
+plt.ylabel("-log10(P-value)")
+plt.title("Manhattan Plot of GWAS Results")
+plt.tight_layout()
+plt.legend()
+
+# Show plot
 plt.show()
