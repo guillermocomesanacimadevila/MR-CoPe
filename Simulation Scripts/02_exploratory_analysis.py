@@ -78,6 +78,9 @@ plt.legend(frameon=True, fontsize=12, loc="upper right", edgecolor="black")
 # Optimise layout
 plt.tight_layout()
 
+# Save Figure
+plt.savefig("exposure_mahattan.png", dpi=300)
+
 # Show plot
 plt.show()
 
@@ -125,5 +128,10 @@ plt.legend(frameon=True, fontsize=12, loc="upper right", edgecolor="black")
 # Optimise layout
 plt.tight_layout()
 
+# Save Figure
+plt.savefig("outcome_mahattan.png", dpi=300)
+
 # Show plot
 plt.show()
+
+print("Exploratory analyses complete!")
