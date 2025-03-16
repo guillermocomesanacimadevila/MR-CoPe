@@ -1,4 +1,4 @@
-## Project Description 
+## Pipeline Description 
 
 Guillermo Comesaña - MSc Bioinformatics @University of Bath
 
