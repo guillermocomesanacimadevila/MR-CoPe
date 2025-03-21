@@ -1,26 +1,30 @@
-# Install required packages
-install.packages("remotes")
-remotes::install_github("MRCIEU/TwoSampleMR@0.4.26")
+#!/usr/bin/env Rscript
+# MR Analysis using TwoSampleMR
+# This script will be used in the main pipeline.
 
-# Load package
-library(TwoSampleMR)
+# --- Load Required Package ---
+suppressPackageStartupMessages(library(TwoSampleMR))
 
-# Set working directory
-setwd("/Users/guillermocomesanacimadevila/Desktop/CRyPTIC_cleaning/MR R")
+# --- Handle Command-Line Arguments --- #
+args <- commandArgs(trailingOnly = TRUE)
+if (length(args) != 1) {
+  stop("Usage: Rscript 04_mr_analyses.R <filtered_SNPs_for_MR.csv>")
+}
+input_file <- args[1]
 
-# Load CSV
-filtered_snps <- read.csv("filtered_SNPs_for_MR.csv", header=TRUE)
+# --- Load CSV --- #
+filtered_snps <- read.csv(input_file, header = TRUE)
 filtered_snps
 
-# Check is has been imported correctly
+# --- Check it has been imported correctly --- #
 dim(filtered_snps)
 print(colnames(filtered_snps))
 
-# Ensure column names are clean
+# --- Ensure column names are clean --- #
 colnames(filtered_snps) <- gsub("\\s+", "", colnames(filtered_snps))
 print(colnames(filtered_snps))
 
-# Rename columns to match TwoSampleMR requirements
+# --- Rename columns to match TwoSampleMR requirements --- #
 colnames(filtered_snps)[colnames(filtered_snps) == "A1_exp"] <- "effect_allele"
 colnames(filtered_snps)[colnames(filtered_snps) == "A2_exp"] <- "other_allele"
 colnames(filtered_snps)[colnames(filtered_snps) == "EAF_exp"] <- "eaf"
@@ -29,7 +33,7 @@ colnames(filtered_snps)[colnames(filtered_snps) == "A1_out"] <- "effect_allele.o
 colnames(filtered_snps)[colnames(filtered_snps) == "A2_out"] <- "other_allele.outcome"
 colnames(filtered_snps)[colnames(filtered_snps) == "EAF_out"] <- "eaf.outcome"
 
-# Ensure required columns exist
+# --- Ensure required columns exist --- #
 required_cols <- c("SNP", "BETA_exp", "SE_exp", "PVALUE_exp", "effect_allele", "other_allele", "eaf")
 missing_cols <- setdiff(required_cols, colnames(filtered_snps))
 
@@ -37,7 +41,7 @@ if (length(missing_cols) > 0) {
   stop(paste("ERROR: Missing required columns:", paste(missing_cols, collapse = ", ")))
 }
 
-# Define Exposure and Outcome datasets
+# --- Define Exposure and Outcome datasets --- #
 exposure_dat <- na.omit(
   data.frame(
     SNP = filtered_snps$SNP,
@@ -62,28 +66,28 @@ outcome_dat <- na.omit(
   )
 )
 
-# Save formatted exposure and outcome data
+# --- Save formatted exposure and outcome data --- #
 write.csv(exposure_dat, "exposure_dat.csv", row.names = FALSE)
 write.csv(outcome_dat, "outcome_dat.csv", row.names = FALSE)
 
-# Format data for MR analysis
+# --- Format data for MR analysis --- #
 exposure_dat <- format_data(exposure_dat, type = "exposure")
 outcome_dat <- format_data(outcome_dat, type = "outcome")
 
-# Merge datasets manually (skip harmonise_data)
+# --- Merge datasets manually (skip harmonise_data) --- #
 harmonised_data <- merge(exposure_dat, outcome_dat, by = "SNP")
 harmonised_data$mr_keep <- TRUE 
 
-# Run MR methods
+# --- Run MR methods --- #
 res_ivw <- mr(harmonised_data, method = "mr_ivw")  
 res_egger <- mr(harmonised_data, method = "mr_egger_regression")  
-res_wmedian <- mr(harmonised_data, method = "mr_weighted_median")  
+res_wmedian <- mr(harmonised_data, method = "mr_weighted_median")
 
-# Sensitivity analyses
+# --- Sensitivity analyses --- #
 heterogeneity <- mr_heterogeneity(harmonised_data)
 pleiotropy <- mr_pleiotropy_test(harmonised_data)
 
-# Compute IVW OR per SNP
+# --- Compute IVW OR per SNP --- #
 IVW_SNP_results <- data.frame(
   SNP = harmonised_data$SNP,
   IVW_OR = exp(harmonised_data$beta.exposure / harmonised_data$se.exposure),
@@ -91,7 +95,7 @@ IVW_SNP_results <- data.frame(
   IVW_Upper_95 = exp((harmonised_data$beta.exposure + 1.96 * harmonised_data$se.exposure) / harmonised_data$se.exposure)
 )
 
-# Create summary results table
+# --- Create summary results table --- #
 results <- data.frame(
   Exposure = "LDL-C",
   Outcome = "Alzheimer's Disease",
@@ -118,8 +122,8 @@ results <- data.frame(
   Mean_F_Statistic = mean(harmonised_data$F_stat, na.rm = TRUE)
 )
 
-# Save results
+# --- Save results --- #
 write.csv(results, "MR_Formatted_Results.csv", row.names = FALSE)
 write.csv(IVW_SNP_results, "MR_IVW_OR_Per_SNP.csv", row.names = FALSE)
 
-print("MR Analysis completed successfully. Results saved to 'MR_Results_Per_SNP.csv'.")
+print("MR Analysis completed successfully. Results saved to 'MR_Formatted_Results.csv' and 'MR_IVW_OR_Per_SNP.csv'.")
