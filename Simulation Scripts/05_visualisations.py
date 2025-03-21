@@ -1,63 +1,96 @@
+#!/usr/bin/env python3
+# Visualisation of MR Results
+# This script will be used in the main pipeline.
+# ==== Initially done in Jupyter Notebook === #
+
+import os
+import sys
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
-import numpy as np
 
-# Load MR summary results
-summary_file = "/Users/guillermocomesanacimadevila/Desktop/CRyPTIC_cleaning/MR R/MR_Formatted_Results.csv"
-mr_results = pd.read_csv(summary_file)
+# --- Handle command-line arguments --- # 
+if len(sys.argv) != 4:
+    print("Usage: python3 05_visualisations.py <MR_Formatted_Results.csv> <MR_IVW_OR_Per_SNP.csv> <output_dir>")
+    sys.exit(1)
 
-# Load per-SNP IVW OR results
-snp_file = "/Users/guillermocomesanacimadevila/Desktop/CRyPTIC_cleaning/MR R/MR_IVW_OR_Per_SNP.csv"
-snp_results = pd.read_csv(snp_file)
+summary_file = sys.argv[1]
+snp_file = sys.argv[2]
+output_dir = sys.argv[3]
+os.makedirs(output_dir, exist_ok=True)
 
-# Ensure numeric conversion
-snp_results[["IVW_OR", "IVW_Lower_95", "IVW_Upper_95"]] = snp_results[["IVW_OR", "IVW_Lower_95", "IVW_Upper_95"]].apply(pd.to_numeric, errors="coerce")
+# =============================== #
+# --- Plot 1: MR Summary Box ---- #
+# =============================== #
 
-# Sort by deviation from OR = 1 (most extreme effects first)
-snp_results["Deviation"] = abs(snp_results["IVW_OR"] - 1)
-snp_results = snp_results.sort_values(by="Deviation", ascending=False)
+# --- Load MR summary results ---
+df = pd.read_csv(summary_file)
+print(f"[INFO] Loaded MR summary: {df.shape}")
 
-# Select top 20 SNPs
-top_snp_results = snp_results.head(20)
+# --- Extract estimates and CIs --- #
+methods = ["IVW", "Weighted Median", "Egger"]
+ORs = [df["IVW_OR"][0], df["WM_OR"][0], df["Egger_OR"][0]]
+Lower = [df["IVW_Lower_95"][0], df["WM_Lower_95"][0], df["Egger_Lower_95"][0]]
+Upper = [df["IVW_Upper_95"][0], df["WM_Upper_95"][0], df["Egger_Upper_95"][0]]
 
-# Set professional styling
-sns.set_style("whitegrid")
-plt.figure(figsize=(7, 10), dpi=300)
+fig, ax = plt.subplots(figsize=(10, 6), dpi=300)
+x = range(len(methods))
+yerr = [[OR - low for OR, low in zip(ORs, Lower)],
+        [up - OR for OR, up in zip(ORs, Upper)]]
 
-# Plot boxplot
-sns.boxplot(data=top_snp_results, y="SNP", x="IVW_OR", color="skyblue", orient="h", width=0.6)
+ax.errorbar(x, ORs, yerr=yerr, fmt='o', color='black', capsize=5, markersize=8, linewidth=2)
+ax.axhline(y=1, color='gray', linestyle='--', linewidth=1.5)
 
-# Overlay individual points (strip plot)
-sns.stripplot(data=top_snp_results, y="SNP", x="IVW_OR", color="black", alpha=0.7, jitter=True, orient="h", size=5)
+ax.set_xticks(x)
+ax.set_xticklabels(methods, fontsize=12, fontweight='bold')
+ax.set_ylabel("Odds Ratio (95% CI)", fontsize=13)
+ax.set_title("MR Effect Estimates (Odds Ratios)", fontsize=16, fontweight='bold', pad=15)
+ax.tick_params(axis='y', labelsize=11)
+fig.tight_layout()
 
-# Add confidence intervals as error bars
-for i, row in enumerate(top_snp_results.itertuples()):
-    plt.plot([row.IVW_Lower_95, row.IVW_Upper_95], [i, i], color="black", linestyle="-", linewidth=1.5)
+summary_plot_path = os.path.join(output_dir, "mr_summary_estimates.png")
+plt.savefig(summary_plot_path, dpi=300)
+plt.close()
+print(f"[INFO] Saved: {summary_plot_path}")
 
-# Add reference line at OR = 1
-plt.axvline(x=1, linestyle="--", color="red", linewidth=1.2, label="Null Effect (OR = 1)")
+# =============================== #
+# --- Plot 2: IVW OR per SNP ---- #
+# =============================== #
 
-# Formatting
-plt.xlabel("IVW Odds Ratio (95% CI)", fontsize=14, fontweight="bold")
-plt.ylabel("SNP", fontsize=14, fontweight="bold")
-plt.xticks(fontsize=12)
-plt.yticks(fontsize=10)
-plt.title("Top 20 SNPs by IVW OR Deviation", fontsize=16, fontweight="bold")
+# --- Load per-SNP results --- #
+snp_df = pd.read_csv(snp_file)
+print(f"[INFO] Loaded SNP-level IVW results: {snp_df.shape[0]} SNPs")
 
-# Remove top and right spines for a cleaner look
-sns.despine()
+# Save full table for reference
+snp_df.to_csv(os.path.join(output_dir, "ivw_all_snp_ORs.csv"), index=False)
 
-# Add legend
-plt.legend(fontsize=12)
+# --- Clean and subset top 30 SNPs --- #
+snp_df["Lower_CI"] = snp_df["IVW_Lower_95"]
+snp_df["Upper_CI"] = snp_df["IVW_Upper_95"]
+top_snp_df = snp_df.nlargest(30, "IVW_OR").copy()
+top_snp_df = top_snp_df.sort_values("IVW_OR", ascending=False).reset_index(drop=True)
 
-# Adjust layout for better spacing
+# --- Forest plot of top 30 SNPs --- #
+plt.figure(figsize=(8, 0.35 * len(top_snp_df) + 2), dpi=300)
+y = range(len(top_snp_df))
+
+plt.errorbar(
+    top_snp_df["IVW_OR"], y,
+    xerr=[
+        top_snp_df["IVW_OR"] - top_snp_df["Lower_CI"],
+        top_snp_df["Upper_CI"] - top_snp_df["IVW_OR"]
+    ],
+    fmt='o', color='black', ecolor='gray', elinewidth=1.5, capsize=3
+)
+
+plt.axvline(x=1, linestyle="--", color="gray")
+plt.yticks(y, top_snp_df["SNP"], fontsize=8)
+plt.xlabel("IVW Odds Ratio (95% CI)", fontsize=12)
+plt.title("Top 30 SNPs by IVW OR", fontsize=14, fontweight="bold")
 plt.tight_layout()
 
-# Save as high-quality image
-plt.savefig("Top20_SNPs_IVW_OR_Boxplot.png", dpi=300, bbox_inches="tight")
+snp_plot_path = os.path.join(output_dir, "ivw_per_snp_forest_plot.png")
+plt.savefig(snp_plot_path, dpi=300)
+plt.close()
+print(f"[INFO] Saved: {snp_plot_path}")
 
-# Show plot
-plt.show()
-
-print("Visualisations completed!")
+print("\n[INFO] Both visualisations generated successfully.")
