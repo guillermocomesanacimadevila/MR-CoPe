@@ -1,9 +1,19 @@
+#!/usr/bin/env python3
+
 # Import libraries
-import os
+import sys
 import pandas as pd
 import numpy as np
 
-# First set seed for reproducibility
+# --- Handle arguments --- #
+if len(sys.argv) != 3:
+    print("Usage: python3 01_generate_simulated_data.py <exposure_output.csv> <outcome_output.csv>")
+    sys.exit(1)
+
+exposure_output_path = sys.argv[1]
+outcome_output_path = sys.argv[2]
+
+# --- Set seed for reproducibility --- #
 np.random.seed(42)
 
 # Number of SNPs - 10K per GWAS
@@ -13,7 +23,7 @@ num_snps = 10000
 snp_ids = [f"rs{1000000 + i}" for i in range(num_snps)]
 
 # Generate random GWAS summary statistics - LDL-c
-ldl_gwas = pd.DataFrame({
+exposure_df = pd.DataFrame({
     "SNP": snp_ids,
     "CHR": np.random.randint(1, 23, size=num_snps),
     "BP": np.random.randint(1e6, 5e7, size=num_snps),
@@ -28,10 +38,10 @@ ldl_gwas = pd.DataFrame({
 p_values = np.random.uniform(0, 1, size=num_snps)
 p_values[: num_snps // 2] = np.random.uniform(0, 0.05, size=num_snps // 2)  # Ensure 50% are < 0.05
 p_values[:500] = np.random.uniform(1e-10, 5e-08, 500)  # Ensure at least 500 SNPs have p < 5e-08
-ldl_gwas["PVALUE"] = p_values
+exposure_df["PVALUE"] = p_values
 
 # Generate random GWAS summary statistics - AD, ensuring P-values are never < 0.05
-ad_gwas = pd.DataFrame({
+outcome_df = pd.DataFrame({
     "SNP": snp_ids,
     "CHR": np.random.randint(1, 23, size=num_snps),
     "BP": np.random.randint(1e6, 5e7, size=num_snps),
@@ -44,8 +54,11 @@ ad_gwas = pd.DataFrame({
 })
 
 # Save to CSV
-ldl_gwas.to_csv("ldl_gwas.csv", index=False, sep=",")
-ad_gwas.to_csv("ad_gwas.csv", index=False, sep=",")
+exposure_df.to_csv(exposure_output_path, index=False)
+outcome_df.to_csv(outcome_output_path, index=False)
 
-print("Simulated GWAS statistics generated! At least 50% of SNPs in LDL GWAS have P-value < 0.05.")
-print("At least 500 SNPs have P-value < 5e-08 in LDL GWAS.")
+# --- Logging --- #
+print(f"[INFO] Simulated exposure GWAS saved to: {exposure_output_path}")
+print(f"[INFO] Simulated outcome GWAS saved to:  {outcome_output_path}")
+print("[INFO] Exposure GWAS: ≥50% SNPs with p < 0.05, ≥500 SNPs with p < 5e-08.")
+print("[INFO] Outcome GWAS:  No SNPs with p < 0.05.")
