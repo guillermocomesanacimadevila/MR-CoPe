@@ -1,85 +1,95 @@
+#!/usr/bin/env nextflow
+
 nextflow.enable.dsl=2
 
+// Define input/output channels
 workflow {
-    
-    // Step 1: Generate GWAS Data
-    generate_gwas_data()
 
-    // Step 2: Exploratory Analysis of GWAS Data
-    exploratory_analysis()
+    // --- PARAMETERS ---
+    params.output_dir = "./results"
 
-    // Step 3: Process GWAS Data (QC, filtering, formatting)
-    process_gwas_data()
+    // --- STEP 1: Simulate data ---
+    process simulate_data {
+        publishDir "${params.output_dir}", mode: 'copy'
 
-    // Step 4: Perform MR Analyses (TwoSampleMR in R)
-    mr_analysis()
+        output:
+        path("exposure_gwas.csv"), emit: exposure
+        path("outcome_gwas.csv"), emit: outcome
 
-    // Step 5: Generate Visualisations
-    visualize_results()
+        script:
+        """
+        python3 01_generate_simulated_data.py exposure_gwas.csv outcome_gwas.csv
+        """
+    }
+
+    // --- STEP 2: Exploratory plots ---
+    process exploratory_analysis {
+        publishDir "${params.output_dir}", mode: 'copy'
+
+        input:
+        path exposure from simulate_data.out.exposure
+        path outcome from simulate_data.out.outcome
+
+        output:
+        path("exposure_manhattan.png")
+        path("outcome_manhattan.png")
+
+        script:
+        """
+        python3 02_exploratory_analysis.py ${exposure} ${outcome} ${params.output_dir}
+        """
+    }
+
+    // --- STEP 3: Filter & Harmonize SNPs ---
+    process gwas_processing {
+        publishDir "${params.output_dir}", mode: 'copy'
+
+        input:
+        path exposure from simulate_data.out.exposure
+        path outcome from simulate_data.out.outcome
+
+        output:
+        path("filtered_SNPs_for_MR.csv"), emit: filtered
+
+        script:
+        """
+        python3 03_gwas_processing.py ${exposure} ${outcome} filtered_SNPs_for_MR.csv
+        """
+    }
+
+    // --- STEP 4: MR Analysis (R) ---
+    process mr_analysis {
+        publishDir "${params.output_dir}", mode: 'copy'
+
+        input:
+        path filtered from gwas_processing.out.filtered
+
+        output:
+        path("MR_Formatted_Results.csv"), emit: summary
+        path("MR_IVW_OR_Per_SNP.csv"), emit: snps
+
+        script:
+        """
+        Rscript 04_mr_analyses.R ${filtered}
+        """
+    }
+
+    // --- STEP 5: Visualise MR results ---
+    process visualisation {
+        publishDir "${params.output_dir}", mode: 'copy'
+
+        input:
+        path summary from mr_analysis.out.summary
+        path snps from mr_analysis.out.snps
+
+        output:
+        path("mr_summary_estimates.png")
+        path("ivw_per_snp_forest_plot.png")
+        path("ivw_all_snp_ORs.csv")
+
+        script:
+        """
+        python3 05_visualisations.py ${summary} ${snps} ${params.output_dir}
+        """
+    }
 }
-
-// Define each process
-
-process generate_gwas_data {
-    tag 'Generating GWAS data'
-    input:
-    output:
-    path "ldl_gwas.csv"
-    path "ad_gwas.csv"
-
-    script:
-    """
-    python 01_generate_simulated_data.py
-    """
-}
-
-process exploratory_analysis {
-    tag 'Exploratory Data Analysis'
-    input:
-    path "ldl_gwas.csv"
-    path "ad_gwas.csv"
-
-    script:
-    """
-    python 02_exploratory_analysis.py
-    """
-}
-
-process process_gwas_data {
-    tag 'Processing GWAS Data'
-    input:
-    path "ldl_gwas.csv"
-    path "ad_gwas.csv"
-    output:
-    path "filtered_SNPs_for_MR.csv"
-
-    script:
-    """
-    python 03_gwas_processing.py
-    """
-}
-
-process mr_analysis {
-    tag 'Performing MR Analysis'
-    input:
-    path "filtered_SNPs_for_MR.csv"
-    output:
-    path "MR_Formatted_Results.csv"
-
-    script:
-    """
-    Rscript 04_mr_analyses.R
-    """
-}
-
-process visualise_results {
-    tag 'Generating MR Visualisations'
-    input:
-    path "MR_Formatted_Results.csv"
-
-    script:
-    """
-    python 05_visualisations.py
-    """
-}
-
