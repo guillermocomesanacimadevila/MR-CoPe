@@ -20,14 +20,9 @@ conda activate mrcope_env
 echo "📦 Installing Python packages..."
 pip install --quiet pandas numpy matplotlib seaborn
 
-# --- Install essential R dependencies --- #
-echo "📦 Installing core R packages..."
-Rscript -e 'install.packages(c("data.table", "optparse", "ggplot2", "tidyverse", "devtools"), repos="https://cloud.r-project.org")'
-
-# Main R script (04_mr_analyses.R) handles the rest!
-
-# --- Run the pipeline --- #
-echo "🚀 Running pipeline..."
+# --- Run Nextflow pipeline --- #
+echo "🚀 Running MR pipeline..."
 nextflow run simulation_mr_pipeline.nf -resume
 
+# --- Nice! --- #
 echo "🎉 Pipeline finished successfully!"
