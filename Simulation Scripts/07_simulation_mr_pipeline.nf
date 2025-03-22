@@ -3,32 +3,36 @@
 nextflow.enable.dsl=2
 
 // --- Parameters ---
-params.output_dir = "./results"
-params.script_dir = "./"  // Folder where your scripts are located
+params.output_dir  = "./results"
+params.script_dir  = "./"  // Folder where your scripts are located
 
-// --- Channels for script files ---
+// --- Workflow ---
 workflow {
 
-    // Declare script file paths as values
-    def script_sim      = file("${params.script_dir}/01_generate_simulated_data.py")
-    def script_explore  = file("${params.script_dir}/02_exploratory_analysis.py")
-    def script_process  = file("${params.script_dir}/03_gwas_processing.py")
-    def script_mr       = file("${params.script_dir}/04_mr_analyses.R")
-    def script_vis      = file("${params.script_dir}/05_visualisations.py")
+    // Declare script file paths
+    def script_sim     = file("${params.script_dir}/01_generate_simulated_data.py")
+    def script_explore = file("${params.script_dir}/02_exploratory_analysis.py")
+    def script_process = file("${params.script_dir}/03_gwas_processing.py")
+    def script_ld      = file("${params.script_dir}/04_linkage_disequillibrium.r")
+    def script_mr      = file("${params.script_dir}/05_mr_analyses.R")
+    def script_vis     = file("${params.script_dir}/06_visualisations.py")
 
-    // Step 1
+    // Step 1: Simulate GWAS data
     simulate_data(script_sim)
 
-    // Step 2
+    // Step 2: Manhattan plots
     exploratory_analysis(script_explore, simulate_data.out.exposure, simulate_data.out.outcome)
 
-    // Step 3
+    // Step 3: Harmonise & filter GWAS
     gwas_processing(script_process, simulate_data.out.exposure, simulate_data.out.outcome)
 
-    // Step 4
-    mr_analysis(script_mr, gwas_processing.out.filtered)
+    // Step 4: LD pruning
+    ld_filtering(script_ld, gwas_processing.out.filtered)
 
-    // Step 5
+    // Step 5: MR analysis
+    mr_analysis(script_mr, ld_filtering.out.pruned)
+
+    // Step 6: Visualisations
     visualisation(script_vis, mr_analysis.out.summary, mr_analysis.out.snps)
 }
 
@@ -85,7 +89,7 @@ process gwas_processing {
     """
 }
 
-process mr_analysis {
+process ld_filtering {
     publishDir "${params.output_dir}", mode: 'copy'
 
     input:
@@ -93,12 +97,28 @@ process mr_analysis {
     path filtered
 
     output:
+    path("ld_pruned_SNPs.csv"), emit: pruned
+
+    script:
+    """
+    Rscript ${script} ${filtered} ld_pruned_SNPs.csv
+    """
+}
+
+process mr_analysis {
+    publishDir "${params.output_dir}", mode: 'copy'
+
+    input:
+    path script
+    path pruned
+
+    output:
     path("MR_Formatted_Results.csv"), emit: summary
     path("MR_IVW_OR_Per_SNP.csv"), emit: snps
 
     script:
     """
-    Rscript ${script} ${filtered}
+    Rscript ${script} ${pruned}
     """
 }
 
