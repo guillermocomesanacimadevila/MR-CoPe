@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Exploratory Analysis for Simulated GWAS data (Optional)
-# This script will not be included in the final pipeline.
+# This script will not be inlcluded in the final pipeline.
 # ==== Initially done in Jupyter Notebook === #
 
 import os
@@ -8,7 +8,6 @@ import sys
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 
 # --- Handle command-line arguments ---
 if len(sys.argv) != 4:
@@ -18,19 +17,22 @@ if len(sys.argv) != 4:
 exposure_path = sys.argv[1]
 outcome_path = sys.argv[2]
 output_dir = sys.argv[3]
-os.makedirs(output_dir, exist_ok=True)
+# Note: output_dir kept for compatibility, but not used in file paths
 
-# --- Helper to parse GWAS CSV --- #
-def parse_gwas(path):
-    return pd.read_csv(os.path.expanduser(path))
+# --- Helper to parse GWAS CSV ---
+def parse_gwas(location):
+    with open(os.path.expanduser(location), "r") as file:
+        return pd.read_csv(file, sep=",", index_col=0)
 
 # --- Load data ---
 exposure = parse_gwas(exposure_path)
 outcome = parse_gwas(outcome_path)
 
 print(f"exposure shape: {exposure.shape}, outcome shape: {outcome.shape}")
-print("\nExposure dtypes:\n", exposure.dtypes)
-print("\nOutcome dtypes:\n", outcome.dtypes)
+print("\nExposure dtypes:")
+print(exposure.dtypes)
+print("\nOutcome dtypes:")
+print(outcome.dtypes)
 
 # --- Check for missing values --- #
 print("\nMissing values in exposure:")
@@ -44,12 +46,9 @@ print(outcome.isna().sum())
 df = exposure[["BP", "PVALUE", "CHR"]].copy()
 df["-log10(PVALUE)"] = -np.log10(df["PVALUE"])
 
-sns.set_style("whitegrid")
 plt.figure(figsize=(16, 8), dpi=300)
-
 chromosomes = sorted(df["CHR"].unique())
 colors = ["#1f77b4", "#d62728"] * (len(chromosomes) // 2 + 1)
-
 x_labels = []
 x_ticks = []
 x_offset = 0
@@ -71,33 +70,27 @@ for i, chrom in enumerate(chromosomes):
 plt.axhline(y=-np.log10(5e-8), color="black", linestyle="dashed", linewidth=1.5,
             label="Genome-wide significance (5e-8)")
 
-plt.xticks(x_ticks, x_labels, rotation=0, fontsize=12, fontweight="bold")
+plt.xticks(x_ticks, x_labels, rotation=90, fontsize=12, fontweight="bold")
 plt.yticks(fontsize=12, fontweight="bold")
 plt.xlabel("Chromosome", fontsize=14, fontweight="bold", labelpad=10)
 plt.ylabel("-log10(P-value)", fontsize=14, fontweight="bold", labelpad=10)
 plt.title("Manhattan Plot of Exposure GWAS", fontsize=18, fontweight="bold", pad=15)
 
-sns.despine()
 plt.legend(frameon=True, fontsize=12, loc="upper right", edgecolor="black")
 plt.tight_layout()
-exposure_plot_path = os.path.join(output_dir, "exposure_manhattan.png")
-plt.savefig(exposure_plot_path, dpi=300)
+plt.savefig("exposure_manhattan.png", dpi=300)
 plt.show()
-print(f"[INFO] Saved: {exposure_plot_path}")
+print("[INFO] Saved: exposure_manhattan.png")
 
 # =============================== #
 # --- Manhattan Plot: Outcome --- #
 # =============================== #
-
 df2 = outcome[["BP", "PVALUE", "CHR"]].copy()
 df2["-log10(PVALUE)"] = -np.log10(df2["PVALUE"])
 
-sns.set_style("whitegrid")
 plt.figure(figsize=(16, 8), dpi=300)
-
 chromosomes = sorted(df2["CHR"].unique())
 colors = ["#1f77b4", "#d62728"] * (len(chromosomes) // 2 + 1)
-
 x_labels = []
 x_ticks = []
 x_offset = 0
@@ -119,18 +112,16 @@ for i, chrom in enumerate(chromosomes):
 plt.axhline(y=-np.log10(5e-8), color="black", linestyle="dashed", linewidth=1.5,
             label="Genome-wide significance (5e-8)")
 
-plt.xticks(x_ticks, x_labels, rotation=0, fontsize=12, fontweight="bold")
+plt.xticks(x_ticks, x_labels, rotation=90, fontsize=12, fontweight="bold")
 plt.yticks(fontsize=12, fontweight="bold")
 plt.xlabel("Chromosome", fontsize=14, fontweight="bold", labelpad=10)
 plt.ylabel("-log10(P-value)", fontsize=14, fontweight="bold", labelpad=10)
 plt.title("Manhattan Plot of Outcome GWAS", fontsize=18, fontweight="bold", pad=15)
 
-sns.despine()
 plt.legend(frameon=True, fontsize=12, loc="upper right", edgecolor="black")
 plt.tight_layout()
-outcome_plot_path = os.path.join(output_dir, "outcome_manhattan.png")
-plt.savefig(outcome_plot_path, dpi=300)
+plt.savefig("outcome_manhattan.png", dpi=300)
 plt.show()
-print(f"[INFO] Saved: {outcome_plot_path}")
+print("[INFO] Saved: outcome_manhattan.png")
 
 print("\n[INFO] Exploratory analyses complete!")
