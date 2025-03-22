@@ -6,20 +6,19 @@
 # Input: filtered SNPs after gwas_processing.py
 # Output: LD-pruned SNP list (r² < 0.001)
 
-# Load packages
+# --- Load Required Packages --- #
 required_packages <- c("LDcorSV")
 missing <- setdiff(required_packages, rownames(installed.packages()))
 if (length(missing) > 0) {
   install.packages(missing, repos = "https://cloud.r-project.org/")
 }
-
 library(LDcorSV)
 
+# --- Handle Args --- #
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) != 2) {
-  stop("Usage: Rscript 04_ld_filtering.R <input_filtered_SNPs.csv> <output_ld_pruned.csv>")
+  stop("Usage: Rscript 04_linkage_disequillibrium.r <input_filtered_SNPs.csv> <output_ld_pruned.csv>")
 }
-
 input_file <- args[1]
 output_file <- args[2]
 
@@ -27,7 +26,7 @@ cat("📥 Loading input:", input_file, "\n")
 gwas <- read.csv(input_file)
 cat("📊 Input rows:", nrow(gwas), "\n")
 
-# Simulate genotype dosages using EAF
+# --- Simulate genotype dosages using EAF --- #
 set.seed(42)
 simulate_genotypes <- function(eaf, n = 500) {
   p <- eaf
@@ -40,11 +39,12 @@ geno_matrix <- sapply(gwas$EAF_exp, simulate_genotypes)
 colnames(geno_matrix) <- gwas$SNP
 geno_matrix <- t(geno_matrix)
 
+# --- Compute LD Matrix --- #
 cat("🔗 Computing LD matrix...\n")
-ld_matrix <- LD.cor(geno_matrix, snp.data = TRUE)
+ld_matrix <- LDcorSV:::LD.cor(geno_matrix, snp.data = TRUE)  # ← fix here
 ld_matrix[upper.tri(ld_matrix, diag = TRUE)] <- 0
 
-# Prune SNPs: keep those with r² < 0.001 with all others
+# --- Prune SNPs with r² >= 0.001 --- #
 keep_snps <- which(apply(ld_matrix < 0.001, 2, all))
 gwas_pruned <- gwas[keep_snps, ]
 
