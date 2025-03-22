@@ -17,8 +17,12 @@ source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate mrcope_env
 
 # --- Install Python dependencies --- #
-echo "📦 Installing Python packages..."
+echo "📦 Installing Python libraries..."
 pip install --quiet pandas numpy matplotlib seaborn
+
+# --- Check installed Python libraries --- #
+echo "🔧 Installed Python libraries:"
+pip list
 
 # --- Run Nextflow pipeline --- #
 echo "🚀 Running MR pipeline..."
