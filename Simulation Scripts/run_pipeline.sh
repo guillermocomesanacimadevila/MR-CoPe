@@ -22,7 +22,7 @@ pip install --quiet pandas numpy matplotlib seaborn
 
 # --- Run Nextflow pipeline --- #
 echo "🚀 Running MR pipeline..."
-nextflow run simulation_mr_pipeline.nf -resume
+nextflow run 07_simulation_mr_pipeline.nf -resume
 
 # --- Nice! --- #
 echo "🎉 Pipeline finished successfully!"
