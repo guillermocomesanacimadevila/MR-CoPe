@@ -2,8 +2,18 @@
 # MR Analysis using TwoSampleMR
 # This script will be used in the main pipeline.
 
-# --- Load Required Package ---
+# --- Install Required Packages if Missing --- #
+required_packages <- c("TwoSampleMR", "optparse", "tidyverse")  
+
+missing <- setdiff(required_packages, rownames(installed.packages()))
+if (length(missing) > 0) {
+  message("📦 Installing missing R packages: ", paste(missing, collapse = ", "))
+  install.packages(missing, repos = "https://cloud.r-project.org/")
+}
+
+# --- Load Required Packages --- #
 suppressPackageStartupMessages(library(TwoSampleMR))
+suppressPackageStartupMessages(library(tidyverse))
 
 # --- Handle Command-Line Arguments --- #
 args <- commandArgs(trailingOnly = TRUE)
