@@ -1,4 +1,4 @@
-## MR-CoPe Description 
+## MR-CoPe Description 🧬🧬
 
 Guillermo Comesaña - MSc Bioinformatics @University of Bath
 
