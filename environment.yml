@@ -1,0 +1,44 @@
+name: mr-cope-env
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  # Core
+  - python=3.10
+  - r-base=4.2
+
+  # Python packages
+  - pandas
+  - numpy
+  - matplotlib
+  - seaborn
+  - scikit-learn
+  - scipy
+  - statsmodels
+  - biopython
+  - pip
+  - pip:
+      - tqdm
+      - pyarrow
+
+  # R packages via conda
+  - r-tidyverse
+  - r-optparse
+  - r-twosamplemr
+  - r-ldcorsv
+
+  # Useful for reproducibility and scripting
+  - r-devtools
+  - r-remotes
+
+  # Optional system tools
+  - r-essentials
+  - r-data.table
+  - r-readr
+  - r-httr
+  - r-jsonlite
+
+  # (Optional) nextflow for pipeline automation
+  - openjdk
+  - nextflow
