@@ -10,6 +10,7 @@ Christian Pepler - MRes Bioscience @Cardiff University
   <img src="https://github.com/user-attachments/assets/25cd4c65-0f17-48bd-abb5-b67aaff3c23c" alt="R" width="60" style="margin: 0 10px;"/>
   <img src="https://github.com/user-attachments/assets/4bbcf45e-d572-45e9-a16c-3ff379e72390" alt="Bash" width="58" style="margin: 0 10px;"/>
   <img src="https://github.com/user-attachments/assets/805532d9-fc8b-446f-aac6-933cc4aa6185" alt="Git" width="58" style="margin: 0 10px;"/>
+  <img src="https://github.com/user-attachments/assets/805532d9-fc8b-446f-aac6-933cc4aa6185" alt="Git" width="58" style="margin: 0 10px;"/>
 </p>
 
 Bioinformatics 🧠 / Data Science 📈 / Genetic Epidemiology 🧬
