@@ -4,7 +4,8 @@ Guillermo Comesaña - MSc Bioinformatics @University of Bath
 
 Christian Pepler - MRes Bioscience @Cardiff University
 
-Python / R / UNIX / SQL -> Nextflow
+## Tools & Languages
+![Python-logo-notext svg-2](https://github.com/user-attachments/assets/b5d66d10-5840-443d-b942-60fa74e662ad)
 
 Bioinformatics 🧠 / Data Science 📈 / Genetic Epidemiology 🧬
 
