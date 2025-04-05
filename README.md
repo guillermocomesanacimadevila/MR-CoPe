@@ -5,7 +5,8 @@ Guillermo Comesaña - MSc Bioinformatics @University of Bath
 Christian Pepler - MRes Bioscience @Cardiff University
 
 ## Tools & Languages
-<img src="https://github.com/user-attachments/assets/b5d66d10-5840-443d-b942-60fa74e662ad" alt="Python logo" width="80"/>
+<img src="https://github.com/user-attachments/assets/b5d66d10-5840-443d-b942-60fa74e662ad" alt="Python logo" width="80"/> ![Rlogo](https://github.com/user-attachments/assets/25cd4c65-0f17-48bd-abb5-b67aaff3c23c)
+
 
 Bioinformatics 🧠 / Data Science 📈 / Genetic Epidemiology 🧬
 
