@@ -14,7 +14,7 @@ Christian Pepler - MRes Bioscience @Cardiff University
   <img src="https://github.com/user-attachments/assets/0427f54d-9e05-4969-91d1-13af16c3fb42" alt="SQL" width="100" style="margin: 0 10px;"/>
 </p>
 
-Bioinformatics 🧠 / Data Science 📈 / Genetic Epidemiology 🧬
+Bioinformatics 💻 / Data Science 📈 / Genetic Epidemiology 🧬
 
 ## What is Mendelian Randomisation
 
