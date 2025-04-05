@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # Visualisation of MR Results
 # This script will be used in the main pipeline.
+# ==== Initially done in Jupyter Notebook === #
 
 import sys
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
 
 # --- Handle command-line arguments ---
 if len(sys.argv) != 4:
@@ -101,33 +101,4 @@ plt.savefig("ivw_per_snp_forest_plot.png", dpi=300)
 plt.close()
 print("[INFO] Saved: ivw_per_snp_forest_plot.png")
 
-# =============================================== #
-# --- Scatterplots of SNP Effects with Slopes --- #
-# =============================================== #
-fig, axes = plt.subplots(1, 3, figsize=(18, 6), dpi=300, sharey=True)
-methods = ["IVW", "Weighted Median", "Egger"]
-colors = ["dodgerblue", "darkorange", "seagreen"]
-slope_keys = ["IVW_slope", "WM_slope", "Egger_slope"]
-
-# Assume you have columns: beta_exposure, beta_outcome, and slopes for each method
-for i, (method, color, slope_key) in enumerate(zip(methods, colors, slope_keys)):
-    ax = axes[i]
-    slope = df[slope_key].values[0]
-    ax.scatter(snp_df["beta_exposure"], snp_df["beta_outcome"], alpha=0.6, color="black")
-    x_vals = snp_df["beta_exposure"]
-    y_vals = slope * x_vals
-    ax.plot(x_vals, y_vals, color=color, linewidth=2.5, label=f"{method} slope")
-    ax.axhline(0, color='gray', linestyle='--', linewidth=1)
-    ax.axvline(0, color='gray', linestyle='--', linewidth=1)
-    ax.set_title(f"{method} MR Scatter", fontsize=13, fontweight='bold')
-    ax.set_xlabel("SNP effect on exposure")
-    if i == 0:
-        ax.set_ylabel("SNP effect on outcome")
-    ax.legend()
-
-plt.tight_layout()
-plt.savefig("mr_scatterplots_panel.png", dpi=300)
-plt.close()
-print("[INFO] Saved: mr_scatterplots_panel.png")
-
-print("\n[INFO] All visualisations generated successfully.")
+print("\n[INFO] Both visualisations generated successfully.")
