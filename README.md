@@ -31,7 +31,7 @@ chmod +x run_pipeline.sh && ./run_pipeline.sh
 
 ### Data Validation (Synthetic GWAS)
 
-## Data Validation (Real GWAS)
+### Data Validation (Real GWAS)
 
 #### MR(1)
 SNPs -> LDl-c -> Alzheimer´s Disease Risk
@@ -40,3 +40,16 @@ SNPs -> Alzheimer´s Disease Risk -> LDL-c
 #### MR(2)
 SNPs -> Iodine-c -> Alzheimer´s Disease Risk
 SNPs -> Alzheimer´s Disease Risk -> Iodine-c
+
+
+### Mendelian Randomisation -> Statistical Methods
+
+#### Inverse Variance Weighted (IVW)
+
+$$
+\hat{\beta}_{\text{IVW}} = \frac{\sum_{i=1}^{N} w_i \cdot \beta_{Y,i} \cdot \beta_{X,i}}{\sum_{i=1}^{N} w_i \cdot \beta_{X,i}^2}
+$$
+
+#### Weighted Median Estimate (WME)
+
+#### MR-Egger
