@@ -20,27 +20,24 @@ Bioinformatics 🧠 / Data Science 📈 / Genetic Epidemiology 🧬
 
 ![1-s2 0-S0753332222003419-gr1](https://github.com/user-attachments/assets/b51c516e-c858-4d13-8529-8683abdf1e09)
 
+## Run Pipeline
+To run the pipeline, give the script execute permission and run it:
+
+```bash
+chmod +x run_pipeline.sh
+./run_pipeline.sh
+```
 
 ## Pipeline Workflow
 
-SNPs -> LDL-c -> Alzheimer's Disease Risk
+### Data Validation (Synthetic GWAS)
 
-SNPs -> Serum Iodine > Alzheimer's Disease Risk
+## Data Validation (Real GWAS)
 
-### Data Mining (VCFs) -> UNIX/Bash
-Exposure GWAS data (LDL-c) -> https://gwas.mrcieu.ac.uk/datasets/ieu-b-110/
+#### MR(1)
+SNPs -> LDl-c -> Alzheimer´s Disease Risk
+SNPs -> Alzheimer´s Disease Risk -> LDL-c
 
-Exposure GWAS data (Serum Iodine) -> N/A
-
-Outcome GWAS data -> https://gwas.mrcieu.ac.uk/datasets/ieu-b-5067/
-
-### Data Cleaning and Pre-processing
--> Reformat VCFs -> CSV files (Python)
-
--> Clean Exposure and Outcome VCFs of any INDELs (SQL)
-
-### Quality Control
-
-### Model Engineering
-
-### Data Visualisation 
+#### MR(2)
+SNPs -> Iodine-c -> Alzheimer´s Disease Risk
+SNPs -> Alzheimer´s Disease Risk -> Iodine-c
