@@ -101,7 +101,8 @@ process ld_filtering {
 
     script:
     """
-    Rscript ${script} ${filtered} ld_pruned_SNPs.csv
+    cp ${filtered} filtered_input.csv
+    Rscript ${script} filtered_input.csv ld_pruned_SNPs.csv
     """
 }
 
