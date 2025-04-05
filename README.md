@@ -6,7 +6,7 @@ Christian Pepler - MRes Bioscience @Cardiff University
 
 ## Tools & Languages
 <p align="left">
-  <img src="https://github.com/user-attachments/assets/b5d66d10-5840-443d-b942-60fa74e662ad" alt="Python logo" width="80"/>
+  <img src="https://github.com/user-attachments/assets/5e678fc0-9597-4252-98dd-eb9aaccc823e" alt="Python logo" width="80"/>
   <img src="https://github.com/user-attachments/assets/25cd4c65-0f17-48bd-abb5-b67aaff3c23c" alt="R logo" width="80"/>
   <img src="https://github.com/user-attachments/assets/4bbcf45e-d572-45e9-a16c-3ff379e72390" alt="Bash logo" width="80"/>
   <img src="https://github.com/user-attachments/assets/805532d9-fc8b-446f-aac6-933cc4aa6185" alt="Git logo" width="80"/>
