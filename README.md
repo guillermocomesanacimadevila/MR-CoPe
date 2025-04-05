@@ -1,4 +1,4 @@
-## Pipeline Description 
+## MR-CoPe Description 
 
 Guillermo Comesaña - MSc Bioinformatics @University of Bath
 
@@ -6,7 +6,7 @@ Christian Pepler - MRes Bioscience @Cardiff University
 
 Python / R / UNIX / SQL -> Nextflow
 
-Bioinformatics 🧬 / Data Science 📈 / Neuroscience 🧠
+Bioinformatics 🧠 / Data Science 📈 / Genetic Epidemiology 🧬
 
 ## What is Mendelian Randomisation
 
