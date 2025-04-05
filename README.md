@@ -46,10 +46,29 @@ SNPs -> Alzheimer´s Disease Risk -> Iodine-c
 
 #### Inverse Variance Weighted (IVW)
 
-$$
-\hat{\beta}_{\text{IVW}} = \frac{\sum_{i=1}^{N} w_i \cdot \beta_{Y,i} \cdot \beta_{X,i}}{\sum_{i=1}^{N} w_i \cdot \beta_{X,i}^2}
-$$
+β_IVW = ( ∑ wᵢ · β_Y,ᵢ · β_X,ᵢ ) / ( ∑ wᵢ · β_X,ᵢ² )
+
+Where:
+- β_Y,ᵢ = SNP–outcome association
+- β_X,ᵢ = SNP–exposure association
+- wᵢ = 1 / SE(β_Y,ᵢ)² = inverse variance of outcome association
 
 #### Weighted Median Estimate (WME)
 
+WME = median( β_Y,ᵢ / β_X,ᵢ ), weighted by 1 / SE(β_Y,ᵢ)²
+
+Where:
+- β_Y,ᵢ = SNP–outcome association
+- β_X,ᵢ = SNP–exposure association
+- SE(β_Y,ᵢ) = standard error of the SNP–outcome association
+
 #### MR-Egger
+
+β_Y,ᵢ = α + β_MR · β_X,ᵢ + εᵢ
+
+Where:
+- β_Y,ᵢ = SNP–outcome association
+- β_X,ᵢ = SNP–exposure association
+- α = intercept term (captures directional pleiotropy)
+- β_MR = estimated causal effect (the slope)
+- εᵢ = error term
