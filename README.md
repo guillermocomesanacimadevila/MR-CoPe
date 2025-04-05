@@ -20,12 +20,11 @@ Bioinformatics 🧠 / Data Science 📈 / Genetic Epidemiology 🧬
 
 ![1-s2 0-S0753332222003419-gr1](https://github.com/user-attachments/assets/b51c516e-c858-4d13-8529-8683abdf1e09)
 
-## Run Pipeline
+## Run Pipeline -> (UNIX-based)
 To run the pipeline, give the script execute permission and run it:
 
 ```bash
-chmod +x run_pipeline.sh
-./run_pipeline.sh
+chmod +x run_pipeline.sh && ./run_pipeline.sh
 ```
 
 ## Pipeline Workflow
