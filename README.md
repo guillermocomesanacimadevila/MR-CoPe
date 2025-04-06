@@ -26,7 +26,7 @@ To run the pipeline, give the script execute permission and run it:
 ```bash
 chmod +x run_pipeline.sh && ./run_pipeline.sh
 ```
-- ** System Requirements ** -
+- ** System Requirements ** 
 ** UNIX-based terminal ** 
 ** Python3 > 3.10 **
 ** R > 4.31 ** 
