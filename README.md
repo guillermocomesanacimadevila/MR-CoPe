@@ -24,7 +24,7 @@ Bioinformatics 💻 / Data Science 📈 / Genetic Epidemiology 🧬
 To run the pipeline, give the script execute permission and run it:
 
 ```bash
-chmod +x run_pipeline.sh && ./run_pipeline.sh
+chmod +x run_mrcope.sh && ./run_mrcope.sh
 ```
 ## System Requirements ->
 ** UNIX-based terminal ** 
