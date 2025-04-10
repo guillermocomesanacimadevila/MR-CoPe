@@ -49,11 +49,20 @@ conda activate mrcope_env
 echo "📦 Installing Python packages..."
 pip install --quiet pandas numpy matplotlib seaborn
 
+# --- Track Start Time --- #
+START_TIME=$(date +%s)
+
 # --- Execute Nextflow Pipeline --- #
+echo ""
 echo "🚀 Launching MR-CoPe Pipeline..."
 nextflow run main.nf --exposure "$EXPOSURE_PATH" --outcome "$OUTCOME_PATH" -resume
 
+# --- Track End Time --- #
+END_TIME=$(date +%s)
+RUNTIME=$((END_TIME - START_TIME))
+
 echo ""
 echo "🎉 MR-CoPe Pipeline completed successfully!"
+echo "⏱️ Total runtime: $((RUNTIME / 60)) minutes and $((RUNTIME % 60)) seconds"
 echo "✨ Outputs are located in: ./results/"
 echo "--------------------------------------------------------"
