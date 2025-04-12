@@ -26,26 +26,75 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def print_header():
-    print("\n" + "="*60)
-    print("MR-CoPe | GWAS Exploratory Analysis")
-    print("="*60 + "\n")
+# ----------------- Auto Column Mapping ----------------- #
+
+AUTO_COLUMN_MAP = {
+    'SNP': ['snp', 'rsid', 'marker', 'rs_number'],
+    'CHR': ['chr', 'chromosome'],
+    'BP': ['bp', 'position', 'pos'],
+    'A1': ['a1', 'effect_allele', 'ea'],
+    'A2': ['a2', 'other_allele', 'oa'],
+    'BETA': ['beta', 'effect_size', 'b'],
+    'SE': ['se', 'stderr', 'standard_error'],
+    'PVALUE': ['pval', 'p_value', 'p'],
+    'EAF': ['eaf', 'effect_allele_freq', 'freq']
+}
 
 
-def validate_inputs(exposure_path, outcome_path, output_dir):
-    for path, label in zip([exposure_path, outcome_path], ["Exposure", "Outcome"]):
-        if not os.path.isfile(path):
-            print(f"❌ ERROR: {label} file not found at: {path}")
-            sys.exit(1)
+def auto_map_columns(df, label):
+    mapping = {}
+    df_cols_lower = [c.lower() for c in df.columns]
 
-    os.makedirs(output_dir, exist_ok=True)
-    print(f"📁 Output directory created (if not existing): {output_dir}\n")
+    print(f"🔎 Auto-mapping columns for {label} GWAS...")
+
+    for standard_name, possible_names in AUTO_COLUMN_MAP.items():
+        for possible in possible_names:
+            if possible in df_cols_lower:
+                matched_col = df.columns[df_cols_lower.index(possible)]
+                mapping[standard_name] = matched_col
+                break
+        if standard_name not in mapping:
+            print(f"⚠️ WARNING: Column for {standard_name} not found in {label} GWAS")
+
+    print(f"✅ Column mapping for {label}:")
+    for k, v in mapping.items():
+        print(f"  {k} --> {v}")
+    return mapping
+
+
+def parse_custom_gwas(df, label):
+    print(f"⚙️ Parsing custom GWAS structure for {label}...")
+    df["SNP"] = df["riskAllele"].str.split("-").str[0]
+    df["CHR"] = df["locations"].str.split(":").str[0]
+    df["BP"] = df["locations"].str.split(":").str[1]
+    df["PVALUE"] = pd.to_numeric(df["pValue"], errors='coerce')
+    df.dropna(subset=["SNP", "CHR", "BP", "PVALUE"], inplace=True)
+    df["CHR"] = df["CHR"].astype(str)
+    df["BP"] = df["BP"].astype(int)
+    print(f"✅ Custom parsing complete for {label}.\n")
+    return df
 
 
 def load_gwas(path, label):
-    print(f"📥 Loading {label} GWAS data...")
-    df = pd.read_csv(path)
-    print(f"✅ {label} GWAS loaded successfully | Shape: {df.shape}\n")
+    print(f"📥 Loading {label} GWAS: {path}")
+    sep = "\t" if path.endswith((".tsv", ".txt")) else ","
+    df = pd.read_csv(path, sep=sep)
+    df.columns = df.columns.str.strip()
+    print(f"✅ Loaded {label} GWAS | Shape: {df.shape}\n")
+
+    mapping = auto_map_columns(df, label)
+
+    # If key columns missing → custom parsing
+    required = ["SNP", "CHR", "BP", "PVALUE"]
+    if not all(k in mapping for k in required):
+        if {"riskAllele", "locations", "pValue"}.issubset(df.columns):
+            df = parse_custom_gwas(df, label)
+        else:
+            print(f"❌ ERROR: Missing critical columns in {label} GWAS and no fallback possible.")
+            sys.exit(1)
+    else:
+        df.rename(columns=mapping, inplace=True)
+
     return df
 
 
@@ -59,10 +108,6 @@ def qc_report(df, label):
 
 
 def manhattan_plot(df, output_path, title):
-    if not {'CHR', 'BP', 'PVALUE'}.issubset(df.columns):
-        print(f"❌ ERROR: Missing required columns in GWAS data: {output_path}")
-        sys.exit(1)
-
     df["-log10(PVALUE)"] = -np.log10(df["PVALUE"])
     chromosomes = sorted(df["CHR"].unique())
     colors = ["#1f77b4", "#d62728"] * (len(chromosomes) // 2 + 1)
@@ -78,8 +123,8 @@ def manhattan_plot(df, output_path, title):
         x_ticks.append(x_offset + (subset["BP"].max() - subset["BP"].min()) / 2)
         x_offset += subset["BP"].max() - subset["BP"].min() + 1
 
-    plt.axhline(y=-np.log10(5e-8), color="black", linestyle="dashed",
-                linewidth=1.5, label="Genome-wide significance (5e-8)")
+    plt.axhline(y=-np.log10(5e-8), color="black", linestyle="dashed", linewidth=1.5,
+                label="Genome-wide significance (5e-8)")
 
     plt.xticks(x_ticks, x_labels, rotation=90, fontsize=12)
     plt.yticks(fontsize=12)
@@ -100,11 +145,14 @@ def main():
 
     exposure_path, outcome_path, output_dir = sys.argv[1], sys.argv[2], sys.argv[3]
 
-    print_header()
+    print("\n" + "=" * 60)
+    print("MR-CoPe | Exploratory Analysis of GWAS Summary Statistics")
+    print("=" * 60 + "\n")
+
     validate_inputs(exposure_path, outcome_path, output_dir)
 
     exposure = load_gwas(exposure_path, "Exposure")
-    outcome  = load_gwas(outcome_path, "Outcome")
+    outcome = load_gwas(outcome_path, "Outcome")
 
     qc_report(exposure, "Exposure")
     qc_report(outcome, "Outcome")
@@ -115,7 +163,7 @@ def main():
 
     print("🎉 Exploratory analysis completed successfully!")
     print(f"All outputs saved in: {output_dir}\n")
-    print("="*60)
+    print("=" * 60)
 
 
 if __name__ == "__main__":
