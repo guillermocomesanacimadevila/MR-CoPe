@@ -24,8 +24,17 @@ Bioinformatics 💻 / Data Science 📈 / Genetic Epidemiology 🧬
 To run the pipeline, give the script execute permission and run it:
 
 ```bash
+git clone https://github.com/guillermocomesanacimadevila/MR-CoPe.git
+```
+
+```bash
+cd MR-CoPe
+```
+
+```bash
 chmod +x run_mrcope.sh && ./run_mrcope.sh
 ```
+
 ## System Requirements ->
 ** UNIX-based terminal ** 
 
