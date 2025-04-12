@@ -18,14 +18,14 @@ echo "🧬 Welcome to MR-CoPe: Mendelian Randomisation Pipeline"
 echo "--------------------------------------------------------"
 
 # --- Prompt for Exposure file --- #
-read -rp "📥 Enter path to Exposure GWAS summary statistics (.csv): " EXPOSURE_PATH
+read -rp "📥 Enter path to Exposure GWAS summary statistics (.csv or .tsv): " EXPOSURE_PATH
 if [[ ! -f "$EXPOSURE_PATH" ]]; then
   echo "❌ ERROR: Exposure file not found at: $EXPOSURE_PATH"
   exit 1
 fi
 
 # --- Prompt for Outcome file --- #
-read -rp "📥 Enter path to Outcome GWAS summary statistics (.csv): " OUTCOME_PATH
+read -rp "📥 Enter path to Outcome GWAS summary statistics (.csv or .tsv): " OUTCOME_PATH
 if [[ ! -f "$OUTCOME_PATH" ]]; then
   echo "❌ ERROR: Outcome file not found at: $OUTCOME_PATH"
   exit 1
@@ -38,31 +38,32 @@ echo "🔗 Outcome file : $OUTCOME_PATH"
 echo "--------------------------------------"
 
 # --- Conda Environment Setup --- #
-echo "🔧 Creating Conda environment (if needed)..."
-conda create -y -n mrcope_env python=3.10 r-base=4.2 >/dev/null 2>&1 || echo "⚠️ Conda env 'mrcope_env' already exists."
+echo ""
+echo "🔧 Checking Conda environment..."
 
+if conda info --envs | grep -q "mrcope_env"; then
+  echo "⚠️  Conda env 'mrcope_env' already exists. Skipping creation."
+else
+  echo "🛠️  Creating Conda env 'mrcope_env'..."
+  conda create -y -n mrcope_env python=3.10 r-base=4.2
+fi
+
+echo ""
 echo "✅ Activating environment..."
 source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate mrcope_env
 
 # --- Install Python dependencies --- #
-echo "📦 Installing Python packages..."
+echo ""
+echo "📦 Installing Python packages (if needed)..."
 pip install --quiet pandas numpy matplotlib seaborn
-
-# --- Track Start Time --- #
-START_TIME=$(date +%s)
 
 # --- Execute Nextflow Pipeline --- #
 echo ""
 echo "🚀 Launching MR-CoPe Pipeline..."
 nextflow run main.nf --exposure "$EXPOSURE_PATH" --outcome "$OUTCOME_PATH" -resume
 
-# --- Track End Time --- #
-END_TIME=$(date +%s)
-RUNTIME=$((END_TIME - START_TIME))
-
 echo ""
 echo "🎉 MR-CoPe Pipeline completed successfully!"
-echo "⏱️ Total runtime: $((RUNTIME / 60)) minutes and $((RUNTIME % 60)) seconds"
-echo "✨ Outputs are located in: ./results/"
+echo "✨ All outputs are located in: ./results/"
 echo "--------------------------------------------------------"
