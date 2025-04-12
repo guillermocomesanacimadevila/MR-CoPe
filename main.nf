@@ -6,7 +6,7 @@ nextflow.enable.dsl=2
 params.output_dir  = "./results"
 params.script_dir  = "./"  // Folder where your scripts are located
 
-// SCRIPTS (Updated for new pipeline files)
+// SCRIPTS
 workflow {
 
     def script_explore   = file("${params.script_dir}/01_exploratory_analysis.py")
@@ -16,11 +16,14 @@ workflow {
     def script_vis_sum   = file("${params.script_dir}/05_visualisations.py")
     def script_vis_scatt = file("${params.script_dir}/06_visualisations.R")
 
-    // Step 1: Exploratory analysis (Manhattan plots)
-    exploratory_analysis(script_explore, params.exposure, params.outcome)
+    def exposure_file = file(params.exposure)
+    def outcome_file  = file(params.outcome)
 
-    // Step 2: GWAS preprocessing (harmonisation, F-stat, INDEL removal)
-    gwas_processing(script_process, params.exposure, params.outcome)
+    // Step 1: Exploratory analysis
+    exploratory_analysis(script_explore, exposure_file, outcome_file)
+
+    // Step 2: GWAS preprocessing
+    gwas_processing(script_process, exposure_file, outcome_file)
 
     // Step 3: LD pruning
     ld_filtering(script_ld, gwas_processing.out.filtered)
@@ -28,22 +31,22 @@ workflow {
     // Step 4: MR analysis
     mr_analysis(script_mr, ld_filtering.out.pruned)
 
-    // Step 5a: Python-based visualisation summary
+    // Step 5a: Python visualisation
     visualisation_summary(script_vis_sum, mr_analysis.out.summary, mr_analysis.out.snps)
 
-    // Step 5b: R-based MR scatter plots
+    // Step 5b: R scatter plots
     visualisation_scatter(script_vis_scatt, mr_analysis.out.harmonised)
 }
 
-// PROCESSES
+// =============================== PROCESSES ===============================
 
 process exploratory_analysis {
     publishDir "${params.output_dir}", mode: 'copy'
 
     input:
     path script
-    path exposure from params.exposure
-    path outcome  from params.outcome
+    path exposure
+    path outcome
 
     output:
     path("exposure_manhattan.png")
@@ -60,8 +63,8 @@ process gwas_processing {
 
     input:
     path script
-    path exposure from params.exposure
-    path outcome  from params.outcome
+    path exposure
+    path outcome
 
     output:
     path("filtered_SNPs_for_MR.csv"), emit: filtered
