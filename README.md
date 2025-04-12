@@ -54,12 +54,9 @@ chmod +x run_mrcope.sh && ./run_mrcope.sh
 
 #### MR(1)
 SNPs -> LDl-c -> Alzheimer´s Disease Risk
-SNPs -> Alzheimer´s Disease Risk -> LDL-c
 
 #### MR(2)
 SNPs -> Iodine-c -> Alzheimer´s Disease Risk
-SNPs -> Alzheimer´s Disease Risk -> Iodine-c
-
 
 ### Mendelian Randomisation -> Statistical Methods
 
@@ -91,3 +88,18 @@ Where:
 - α = intercept term (captures directional pleiotropy)
 - β_MR = estimated causal effect (the slope)
 - εᵢ = error term
+
+### Genetic Instrument Strength
+
+#### F-statistic
+
+### Heterogeneity and Horizontal Pleiotropy
+
+#### Cochran Q Statistic + p-Val -> IVW/WME
+
+#### I2 Statistic -> MR-Egger
+
+#### Egger Intercept 
+$$
+Z_i = \beta_0 + \beta_1 \cdot SE_i^{-1} + \epsilon_i
+$$
