@@ -21,7 +21,7 @@ Bioinformatics 💻 / Data Science 📈 / Genetic Epidemiology 🧬
 ![1-s2 0-S0753332222003419-gr1](https://github.com/user-attachments/assets/b51c516e-c858-4d13-8529-8683abdf1e09)
 
 ## Run Pipeline -> (UNIX-based)
-To run the pipeline, give the script execute permission and run it:
+To run the pipeline, clone the repo, and give the script execute permission and run it:
 
 ```bash
 git clone https://github.com/guillermocomesanacimadevila/MR-CoPe.git
