@@ -60,28 +60,62 @@ SNPs -> Iodine-c -> Alzheimer´s Disease Risk
 
 ### Mendelian Randomisation -> Statistical Methods
 
-#### Inverse Variance Weighted (IVW) Estimator
+#### 📐 Inverse-Variance Weighted (IVW) Estimator
 
-<details>
-<summary>📐 Click to view LaTeX version</summary>
+The IVW method estimates the causal effect (β_IVW) by performing a weighted regression of 
+SNP-outcome effects (β_Yi) on SNP-exposure effects (β_Xi), **without an intercept**:
+
+    β_Yi = β_IVW · β_Xi + ε_i
+
+To obtain β_IVW, we minimize the weighted sum of squared residuals:
+
+             ⎡  ∑ (w_i · β_Xi · β_Yi)  ⎤
+    β_IVW = ⎢ ------------------------ ⎥
+             ⎣   ∑ (w_i · β_Xi²)      ⎦
+
+Where the weights are defined as the inverse variance of the outcome effect estimates:
+
+    w_i = 1 / SE_Yi²
+
+#### 🧮 Weighted Median Estimator (WME)
+
+The Weighted Median Estimator provides a consistent causal effect estimate 
+even when up to 50% of the instruments are invalid.
+
+Given a set of ratio estimates:
+
+    β_i = β_Yi / β_Xi
+
+Each estimate is weighted by the inverse variance of β_Yi:
+
+    w_i = 1 / SE_Yi²
+
+The WME is the **median** of the β_i values, ordered and weighted by w_i.
+
+This method is robust to violations of the exclusion restriction, assuming that
+at least 50% of the total weight comes from valid instruments.
+
+#### 📐 MR-Egger Regression
+
+MR-Egger accounts for directional pleiotropy by introducing an intercept in the regression model.
+
+For each SNP \( i \), the model is:
 
 $$
-\hat{\beta}_{Yi} = \beta_{\text{IVW}} \cdot \hat{\beta}_{Xi} + \epsilon_i
+\hat{\beta}_{Yi} = \beta_0 + \beta_{\text{Egger}} \cdot \hat{\beta}_{Xi} + \epsilon_i
 $$
 
-$$
-\beta_{\text{IVW}} = \frac{\sum_{i} w_i \hat{\beta}_{Xi} \hat{\beta}_{Yi}}{\sum_{i} w_i \hat{\beta}_{Xi}^2}
-$$
+- \( \beta_{\text{Egger}} \): the causal effect estimate
+- \( \beta_0 \): the intercept capturing average pleiotropic effects
+- \( \epsilon_i \): error term
+
+This method performs a **weighted linear regression**, using weights:
 
 $$
 w_i = \frac{1}{SE_{Yi}^2}
 $$
 
-</details>
-
-#### Weighted Median Estimate (WME)
-
-#### MR-Egger
+A significant non-zero \( \beta_0 \) suggests the presence of **directional pleiotropy**, violating the exclusion restriction assumption.
 
 ### Genetic Instrument Strength
 
