@@ -25,7 +25,6 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-
 # ----------------- Auto Column Mapping ----------------- #
 
 AUTO_COLUMN_MAP = {
@@ -37,9 +36,8 @@ AUTO_COLUMN_MAP = {
     'BETA': ['beta', 'effect_size', 'b'],
     'SE': ['se', 'stderr', 'standard_error'],
     'PVALUE': ['pval', 'p_value', 'p'],
-    'EAF': ['eaf', 'effect_allele_freq', 'freq']
+    'EAF': ['eaf', 'effect_allele_freq', 'freq', 'riskfrequency']
 }
-
 
 def auto_map_columns(df, label):
     mapping = {}
@@ -61,19 +59,25 @@ def auto_map_columns(df, label):
         print(f"  {k} --> {v}")
     return mapping
 
-
 def parse_custom_gwas(df, label):
     print(f"⚙️ Parsing custom GWAS structure for {label}...")
     df["SNP"] = df["riskAllele"].str.split("-").str[0]
     df["CHR"] = df["locations"].str.split(":").str[0]
-    df["BP"] = df["locations"].str.split(":").str[1]
+    raw_bp = df["locations"].str.split(":").str[1]
+
+    if raw_bp.str.contains(r"\D", regex=True).any():
+        print("🧹 Detected non-numeric BP values — extracting digits...")
+        df["BP"] = raw_bp.str.extract(r"(\d+)")[0]
+    else:
+        df["BP"] = raw_bp
+
+    df["BP"] = pd.to_numeric(df["BP"], errors='coerce')
     df["PVALUE"] = pd.to_numeric(df["pValue"], errors='coerce')
     df.dropna(subset=["SNP", "CHR", "BP", "PVALUE"], inplace=True)
     df["CHR"] = df["CHR"].astype(str)
     df["BP"] = df["BP"].astype(int)
     print(f"✅ Custom parsing complete for {label}.\n")
     return df
-
 
 def load_gwas(path, label):
     print(f"📥 Loading {label} GWAS: {path}")
@@ -97,7 +101,6 @@ def load_gwas(path, label):
 
     return df
 
-
 def qc_report(df, label):
     print(f"🔎 QC Summary: {label} GWAS")
     print("-" * 40)
@@ -105,7 +108,6 @@ def qc_report(df, label):
     print("\nMissing values per column:")
     print(df.isna().sum())
     print("\n")
-
 
 def manhattan_plot(df, output_path, title):
     df["-log10(PVALUE)"] = -np.log10(df["PVALUE"])
@@ -137,6 +139,15 @@ def manhattan_plot(df, output_path, title):
     plt.close()
     print(f"✅ Manhattan plot saved: {output_path}\n")
 
+def validate_inputs(exposure_path, outcome_path, output_dir):
+    if not os.path.isfile(exposure_path):
+        print(f"❌ ERROR: Exposure file not found: {exposure_path}")
+        sys.exit(1)
+    if not os.path.isfile(outcome_path):
+        print(f"❌ ERROR: Outcome file not found: {outcome_path}")
+        sys.exit(1)
+    if not os.path.isdir(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
 
 def main():
     if len(sys.argv) != 4:
@@ -164,7 +175,6 @@ def main():
     print("🎉 Exploratory analysis completed successfully!")
     print(f"All outputs saved in: {output_dir}\n")
     print("=" * 60)
-
 
 if __name__ == "__main__":
     main()
