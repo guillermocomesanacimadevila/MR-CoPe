@@ -97,26 +97,6 @@ at least 50% of the total weight comes from valid instruments.
 
 #### 📐 MR-Egger Regression
 
-MR-Egger allows for directional pleiotropy by adding an intercept term to the regression model:
-
-$$
-\hat{\beta}_{Yi} = \beta_0 + \beta_{\text{Egger}} \cdot \hat{\beta}_{Xi} + \epsilon_i
-$$
-
-To estimate \( \beta_{\text{Egger}} \), we perform a **weighted linear regression** of SNP-outcome effects on SNP-exposure effects **with an intercept**. The causal effect is given by the slope:
-
-$$
-\beta_{\text{Egger}} = \frac{\sum_{i} w_i (\hat{\beta}_{Xi} - \bar{\beta}_X)(\hat{\beta}_{Yi} - \bar{\beta}_Y)}{\sum_{i} w_i (\hat{\beta}_{Xi} - \bar{\beta}_X)^2}
-$$
-
-Where the weights are defined as:
-
-$$
-w_i = \frac{1}{SE_{Yi}^2}
-$$
-
-The intercept \( \beta_0 \) captures **average directional pleiotropy**.
-
 ### Genetic Instrument Strength
 
 #### F-statistic
