@@ -33,7 +33,7 @@ AUTO_COLUMN_MAP = {
     'BETA': ['beta', 'effect_size', 'b'],
     'SE': ['se', 'stderr', 'standard_error'],
     'PVALUE': ['pval', 'p_value', 'p'],
-    'EAF': ['eaf', 'effect_allele_freq', 'freq']
+    'EAF': ['eaf', 'effect_allele_freq', 'freq', 'riskfrequency']
 }
 
 def print_header():
@@ -71,7 +71,15 @@ def parse_custom_gwas(df, label):
     print(f"⚙️ Parsing custom GWAS structure for {label}...")
     df["SNP"] = df["riskAllele"].str.split("-").str[0]
     df["CHR"] = df["locations"].str.split(":").str[0]
-    df["BP"] = df["locations"].str.split(":").str[1]
+    raw_bp = df["locations"].str.split(":").str[1]
+
+    if raw_bp.str.contains(r"\D", regex=True).any():
+        print("🧹 Detected non-numeric BP values — extracting digits...")
+        df["BP"] = raw_bp.str.extract(r"(\d+)")[0]
+    else:
+        df["BP"] = raw_bp
+
+    df["BP"] = pd.to_numeric(df["BP"], errors='coerce')
     df["PVALUE"] = pd.to_numeric(df["pValue"], errors='coerce')
     df.dropna(subset=["SNP", "CHR", "BP", "PVALUE"], inplace=True)
     df["CHR"] = df["CHR"].astype(str)
@@ -107,7 +115,7 @@ def calculate_f_statistics(df):
         df["F_stat"] = (df["BETA"] ** 2) / (df["SE"] ** 2)
     else:
         print("⚠️ WARNING: SE column not found — Skipping F-statistic filtering")
-        df["F_stat"] = 9999  # Large dummy value to keep all SNPs
+        df["F_stat"] = 9999
     return df
 
 def main():
@@ -129,7 +137,6 @@ def main():
     exposure = exposure[exposure["SNP"].isin(common_snps)].dropna()
     outcome = outcome[outcome["SNP"].isin(common_snps)].dropna()
 
-    # Remove INDELs if possible
     if "A1" in exposure.columns and "A2" in exposure.columns:
         exposure = exposure[exposure["A1"].apply(is_snp_allele) & exposure["A2"].apply(is_snp_allele)]
         outcome = outcome[outcome["A1"].apply(is_snp_allele) & outcome["A2"].apply(is_snp_allele)]
@@ -151,12 +158,17 @@ def main():
     print(f"📏 Outcome after F-stat filtering: {outcome.shape}\n")
 
     merged = pd.merge(exposure, outcome, on="SNP", suffixes=("_exp", "_out"))
-    print(f"🔀 Final merged dataset shape: {merged.shape}\n")
 
+    # Patch column names so LD script works
+    if "riskFrequency_exp" in merged.columns:
+        merged.rename(columns={"riskFrequency_exp": "EAF_exp"}, inplace=True)
+    if "riskFrequency_out" in merged.columns:
+        merged.rename(columns={"riskFrequency_out": "EAF_out"}, inplace=True)
+
+    print(f"🔀 Final merged dataset shape: {merged.shape}\n")
     merged.to_csv(output_path, index=False)
     print(f"✅ Filtered & harmonised GWAS saved to: {output_path}")
     print("=" * 60 + "\n")
-
 
 if __name__ == "__main__":
     main()
