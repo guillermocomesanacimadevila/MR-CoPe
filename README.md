@@ -62,23 +62,17 @@ SNPs -> Iodine-c -> Alzheimer´s Disease Risk
 
 #### Inverse Variance Weighted (IVW) Estimator
 
-The IVW method estimates the causal effect ($\beta_{\text{IVW}}$) by performing a weighted regression of SNP-outcome effects ($\hat{\beta}_{Yi}$) on SNP-exposure effects ($\hat{\beta}_{Xi}$), **without an intercept**:
+The IVW method estimates the causal effect (**β<sub>IVW</sub>**) by performing a weighted regression of SNP-outcome effects (**β̂<sub>Yi</sub>**) on SNP-exposure effects (**β̂<sub>Xi</sub>**), **without an intercept**:
 
-$$
-\hat{\beta}_{Yi} = \beta_{\text{IVW}} \cdot \hat{\beta}_{Xi} + \epsilon_i
-$$
+> β̂<sub>Yi</sub> = β<sub>IVW</sub> × β̂<sub>Xi</sub> + ε<sub>i</sub>
 
-To obtain $\beta_{\text{IVW}}$, we minimize the weighted sum of squared residuals:
+To obtain **β<sub>IVW</sub>**, we minimize the weighted sum of squared residuals:
 
-$$
-\beta_{\text{IVW}} = \frac{\sum_{i} w_i \hat{\beta}_{Xi} \hat{\beta}_{Yi}}{\sum_{i} w_i \hat{\beta}_{Xi}^2}
-$$
+> β<sub>IVW</sub> = ∑ w<sub>i</sub> × β̂<sub>Xi</sub> × β̂<sub>Yi</sub> / ∑ w<sub>i</sub> × β̂<sub>Xi</sub><sup>2</sup>
 
 where weights are defined as the inverse of the variance of the outcome effect estimates:
 
-$$
-w_i = \frac{1}{SE_{Yi}^2}
-$$
+> w<sub>i</sub> = 1 / SE<sub>Yi</sub><sup>2</sup>
 
 #### Weighted Median Estimate (WME)
 
