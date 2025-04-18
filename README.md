@@ -60,34 +60,29 @@ SNPs -> Iodine-c -> Alzheimer´s Disease Risk
 
 ### Mendelian Randomisation -> Statistical Methods
 
-#### Inverse Variance Weighted (IVW)
+#### Inverse Variance Weighted (IVW) Estimator
 
-β_IVW = ( ∑ wᵢ · β_Y,ᵢ · β_X,ᵢ ) / ( ∑ wᵢ · β_X,ᵢ² )
+The IVW method estimates the causal effect ($\beta_{\text{IVW}}$) by performing a weighted regression of SNP-outcome effects ($\hat{\beta}_{Yi}$) on SNP-exposure effects ($\hat{\beta}_{Xi}$), **without an intercept**:
 
-Where:
-- β_Y,ᵢ = SNP–outcome association
-- β_X,ᵢ = SNP–exposure association
-- wᵢ = 1 / SE(β_Y,ᵢ)² = inverse variance of outcome association
+$$
+\hat{\beta}_{Yi} = \beta_{\text{IVW}} \cdot \hat{\beta}_{Xi} + \epsilon_i
+$$
+
+To obtain $\beta_{\text{IVW}}$, we minimize the weighted sum of squared residuals:
+
+$$
+\beta_{\text{IVW}} = \frac{\sum_{i} w_i \hat{\beta}_{Xi} \hat{\beta}_{Yi}}{\sum_{i} w_i \hat{\beta}_{Xi}^2}
+$$
+
+where weights are defined as the inverse of the variance of the outcome effect estimates:
+
+$$
+w_i = \frac{1}{SE_{Yi}^2}
+$$
 
 #### Weighted Median Estimate (WME)
 
-WME = median( β_Y,ᵢ / β_X,ᵢ ), weighted by 1 / SE(β_Y,ᵢ)²
-
-Where:
-- β_Y,ᵢ = SNP–outcome association
-- β_X,ᵢ = SNP–exposure association
-- SE(β_Y,ᵢ) = standard error of the SNP–outcome association
-
 #### MR-Egger
-
-β_Y,ᵢ = α + β_MR · β_X,ᵢ + εᵢ
-
-Where:
-- β_Y,ᵢ = SNP–outcome association
-- β_X,ᵢ = SNP–exposure association
-- α = intercept term (captures directional pleiotropy)
-- β_MR = estimated causal effect (the slope)
-- εᵢ = error term
 
 ### Genetic Instrument Strength
 
