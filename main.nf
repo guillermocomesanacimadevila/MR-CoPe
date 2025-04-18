@@ -49,8 +49,8 @@ process exploratory_analysis {
     path outcome
 
     output:
-    path("exposure_manhattan.png")
-    path("outcome_manhattan.png")
+    path("${params.output_dir}/exposure_manhattan.png"), optional: true
+    path("${params.output_dir}/outcome_manhattan.png"), optional: true
 
     script:
     """
