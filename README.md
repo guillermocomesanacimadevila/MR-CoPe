@@ -97,25 +97,25 @@ at least 50% of the total weight comes from valid instruments.
 
 #### 📐 MR-Egger Regression
 
-MR-Egger accounts for directional pleiotropy by introducing an intercept in the regression model.
-
-For each SNP \( i \), the model is:
+MR-Egger allows for directional pleiotropy by adding an intercept term to the regression model:
 
 $$
 \hat{\beta}_{Yi} = \beta_0 + \beta_{\text{Egger}} \cdot \hat{\beta}_{Xi} + \epsilon_i
 $$
 
-- \( \beta_{\text{Egger}} \): the causal effect estimate
-- \( \beta_0 \): the intercept capturing average pleiotropic effects
-- \( \epsilon_i \): error term
+To estimate \( \beta_{\text{Egger}} \), we perform a **weighted linear regression** of SNP-outcome effects on SNP-exposure effects **with an intercept**. The causal effect is given by the slope:
 
-This method performs a **weighted linear regression**, using weights:
+$$
+\beta_{\text{Egger}} = \frac{\sum_{i} w_i (\hat{\beta}_{Xi} - \bar{\beta}_X)(\hat{\beta}_{Yi} - \bar{\beta}_Y)}{\sum_{i} w_i (\hat{\beta}_{Xi} - \bar{\beta}_X)^2}
+$$
+
+Where the weights are defined as:
 
 $$
 w_i = \frac{1}{SE_{Yi}^2}
 $$
 
-A significant non-zero \( \beta_0 \) suggests the presence of **directional pleiotropy**, violating the exclusion restriction assumption.
+The intercept \( \beta_0 \) captures **average directional pleiotropy**.
 
 ### Genetic Instrument Strength
 
