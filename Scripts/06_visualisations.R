@@ -19,25 +19,28 @@
 # - MR_Scatter_IVW.png
 # - MR_Scatter_Egger.png
 # - MR_Scatter_WME.png
+# - MR_LeaveOneOut.png
 # ================================================================
 
 suppressPackageStartupMessages({
   library(ggplot2)
   library(ggrepel)
+  library(TwoSampleMR)
+  library(dplyr)
 })
 
 # ---- Handle Arguments ----
 args <- commandArgs(trailingOnly = TRUE)
 
 if (length(args) != 2) {
-  stop("Usage: Rscript 07_mr_scatter_plots.R <harmonised_data.csv> <output_dir>")
+  stop("Usage: Rscript 06_visualisations.R <harmonised_data.csv> <output_dir>")
 }
 
 input_file <- args[1]
 output_dir <- args[2]
 
 cat("\n==============================================================\n")
-cat("MR-CoPe | Scatter Plots of MR Results\n")
+cat("MR-CoPe | MR Scatter + Leave-One-Out Plots\n")
 cat("==============================================================\n\n")
 
 if (!file.exists(input_file)) {
@@ -50,12 +53,11 @@ cat("📥 Loading harmonised data:", input_file, "\n")
 harmonised <- read.csv(input_file)
 cat("📊 SNPs available for plotting:", nrow(harmonised), "\n\n")
 
-
 # ---- General Scatter Plot Function ----
 create_plot <- function(data, method, intercept, slope, color, linetype, filename) {
   p <- ggplot(data, aes(x = beta.exposure, y = beta.outcome)) +
-    geom_point(size = 4, color = "black") +
-    geom_text_repel(aes(label = SNP), size = 4, max.overlaps = 100) +
+    geom_point(size = 3.5, color = "black") +
+    geom_text_repel(aes(label = SNP), size = 3.5, max.overlaps = 100) +
     geom_abline(intercept = intercept, slope = slope, color = color, linetype = linetype, size = 1.2) +
     labs(
       title = paste("MR Scatter Plot -", method),
@@ -69,28 +71,47 @@ create_plot <- function(data, method, intercept, slope, color, linetype, filenam
   cat("✅ Saved:", out_path, "\n")
 }
 
-
-# ---- IVW Plot ----
+# ---- IVW ----
 cat("📊 Creating IVW Scatter Plot...\n")
 ivw_model <- lm(beta.outcome ~ beta.exposure, data = harmonised)
 create_plot(harmonised, "IVW", coef(ivw_model)[1], coef(ivw_model)[2],
             color = "blue", linetype = "solid", filename = "MR_Scatter_IVW.png")
 
-
-# ---- MR Egger Plot ----
+# ---- Egger ----
 cat("📊 Creating Egger Scatter Plot...\n")
 egger_model <- lm(beta.outcome ~ beta.exposure, data = harmonised)
 create_plot(harmonised, "Egger", coef(egger_model)[1], coef(egger_model)[2],
             color = "red", linetype = "dashed", filename = "MR_Scatter_Egger.png")
 
-
-# ---- Weighted Median Plot ----
+# ---- Weighted Median ----
 cat("📊 Creating Weighted Median Scatter Plot...\n")
 wme_model <- lm(beta.outcome ~ beta.exposure + 0, data = harmonised)
 create_plot(harmonised, "Weighted Median", intercept = 0, coef(wme_model)[1],
             color = "darkgreen", linetype = "dotdash", filename = "MR_Scatter_WME.png")
 
 
-cat("\n🎉 Scatter plot generation completed!")
+# ---- Leave-One-Out Analysis ----
+cat("📊 Performing Leave-One-Out analysis...\n")
+
+harmonised <- harmonised %>% mutate(id.exposure = "Exposure", id.outcome = "Outcome")
+res_loo <- mr_leaveoneout(harmonised)
+res_loo <- res_loo %>% filter(method == "Inverse variance weighted")
+
+p_loo <- ggplot(res_loo, aes(x = b, y = reorder(SNP, b))) +
+  geom_point(size = 3) +
+  geom_errorbarh(aes(xmin = b - 1.96 * se, xmax = b + 1.96 * se), height = 0.25) +
+  labs(
+    title = "Leave-One-Out Analysis (IVW)",
+    x = "Causal Estimate (β)",
+    y = "SNP"
+  ) +
+  theme_minimal(base_size = 14)
+
+out_loo <- file.path(output_dir, "MR_LeaveOneOut.png")
+ggsave(out_loo, p_loo, width = 9, height = 7, dpi = 300)
+cat("✅ Saved:", out_loo, "\n")
+
+
+cat("\n🎉 All visualisations completed!")
 cat("\nAll outputs saved in:", output_dir)
 cat("\n==============================================================\n\n")
