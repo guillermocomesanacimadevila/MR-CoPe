@@ -56,7 +56,7 @@ conda activate mrcope_env
 # --- Install Python dependencies --- #
 echo ""
 echo "📦 Installing Python packages (if needed)..."
-pip install --quiet pandas numpy matplotlib seaborn
+pip install --quiet pandas numpy matplotlib seaborn scipy
 
 # --- Execute Nextflow Pipeline --- #
 echo ""
