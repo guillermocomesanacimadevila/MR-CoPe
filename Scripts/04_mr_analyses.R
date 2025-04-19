@@ -40,7 +40,7 @@ suppressPackageStartupMessages({
 args <- commandArgs(trailingOnly = TRUE)
 
 if (length(args) != 1) {
-  stop("Usage: Rscript 05_mr_analysis.R <input_ld_pruned_snps.csv>")
+  stop("Usage: Rscript 04_mr_analysis.R <input_ld_pruned_snps.csv>")
 }
 
 input_file <- args[1]
@@ -95,9 +95,8 @@ exposure_dat <- format_data(exposure_dat, type = "exposure")
 outcome_dat <- format_data(outcome_dat, type = "outcome")
 
 
-# ---- Manual Harmonisation ----
-harmonised_data <- merge(exposure_dat, outcome_dat, by = "SNP")
-harmonised_data$mr_keep <- TRUE  # Keep all SNPs (already harmonised upstream)
+# ---- Harmonise Datasets ----
+harmonised_data <- harmonise_data(exposure_dat, outcome_dat, action = 2)
 
 write.csv(harmonised_data, "harmonised_data.csv", row.names = FALSE)
 
@@ -106,9 +105,8 @@ cat("📊 SNPs after harmonisation:", nrow(harmonised_data), "\n\n")
 
 # ---- Run MR Analyses ----
 cat("⚙️ Running MR methods...\n")
-res_ivw <- mr(harmonised_data, method = "mr_ivw")
-res_egger <- mr(harmonised_data, method = "mr_egger_regression")
-res_wmedian <- mr(harmonised_data, method = "mr_weighted_median")
+methods <- c("mr_ivw", "mr_egger_regression", "mr_weighted_median")
+results_df <- mr(harmonised_data, method_list = methods)
 
 
 # ---- Sensitivity Analyses ----
@@ -128,23 +126,23 @@ write.csv(IVW_SNP_results, "MR_IVW_OR_Per_SNP.csv", row.names = FALSE)
 
 
 # ---- MR Summary Table ----
-results <- data.frame(
+results <- tibble(
   N_SNPs = nrow(harmonised_data),
 
-  IVW_OR = if (!is.null(res_ivw$b)) exp(res_ivw$b) else NA,
-  IVW_CI_Lower = if (!is.null(res_ivw$b)) exp(res_ivw$b + qnorm(.025) * res_ivw$se) else NA,
-  IVW_CI_Upper = if (!is.null(res_ivw$b)) exp(res_ivw$b + qnorm(.975) * res_ivw$se) else NA,
-  IVW_Pval = res_ivw$pval,
+  IVW_OR = results_df %>% filter(method == "Inverse variance weighted") %>% pull(b) %>% exp(),
+  IVW_CI_Lower = results_df %>% filter(method == "Inverse variance weighted") %>% mutate(lower = b + qnorm(.025) * se) %>% pull(lower) %>% exp(),
+  IVW_CI_Upper = results_df %>% filter(method == "Inverse variance weighted") %>% mutate(upper = b + qnorm(.975) * se) %>% pull(upper) %>% exp(),
+  IVW_Pval = results_df %>% filter(method == "Inverse variance weighted") %>% pull(pval),
 
-  WM_OR = if (!is.null(res_wmedian$b)) exp(res_wmedian$b) else NA,
-  WM_CI_Lower = if (!is.null(res_wmedian$b)) exp(res_wmedian$b + qnorm(.025) * res_wmedian$se) else NA,
-  WM_CI_Upper = if (!is.null(res_wmedian$b)) exp(res_wmedian$b + qnorm(.975) * res_wmedian$se) else NA,
-  WM_Pval = res_wmedian$pval,
+  WM_OR = results_df %>% filter(method == "Weighted median") %>% pull(b) %>% exp(),
+  WM_CI_Lower = results_df %>% filter(method == "Weighted median") %>% mutate(lower = b + qnorm(.025) * se) %>% pull(lower) %>% exp(),
+  WM_CI_Upper = results_df %>% filter(method == "Weighted median") %>% mutate(upper = b + qnorm(.975) * se) %>% pull(upper) %>% exp(),
+  WM_Pval = results_df %>% filter(method == "Weighted median") %>% pull(pval),
 
-  Egger_OR = if (!is.null(res_egger$b)) exp(res_egger$b) else NA,
-  Egger_CI_Lower = if (!is.null(res_egger$b)) exp(res_egger$b + qnorm(.025) * res_egger$se) else NA,
-  Egger_CI_Upper = if (!is.null(res_egger$b)) exp(res_egger$b + qnorm(.975) * res_egger$se) else NA,
-  Egger_Pval = res_egger$pval,
+  Egger_OR = results_df %>% filter(method == "MR Egger") %>% pull(b) %>% exp(),
+  Egger_CI_Lower = results_df %>% filter(method == "MR Egger") %>% mutate(lower = b + qnorm(.025) * se) %>% pull(lower) %>% exp(),
+  Egger_CI_Upper = results_df %>% filter(method == "MR Egger") %>% mutate(upper = b + qnorm(.975) * se) %>% pull(upper) %>% exp(),
+  Egger_Pval = results_df %>% filter(method == "MR Egger") %>% pull(pval),
 
   Egger_Intercept_Pval = pleiotropy$pval,
   IVW_Het_Q_Pval = heterogeneity$Q_pval[heterogeneity$method == "Inverse variance weighted"],
