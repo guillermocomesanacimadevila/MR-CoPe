@@ -69,7 +69,7 @@ SNP-outcome effects (β_Yi) on SNP-exposure effects (β_Xi), **without an interc
 
 To obtain β_IVW, we minimize the weighted sum of squared residuals:
 
-             ⎡  ∑ (w_i · β_Xi · β_Yi)  ⎤
+             ⎡  ∑ (w_i · β_Xi · β_Yi) ⎤
     β_IVW = ⎢ ------------------------ ⎥
              ⎣   ∑ (w_i · β_Xi²)      ⎦
 
