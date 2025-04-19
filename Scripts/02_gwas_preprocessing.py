@@ -18,22 +18,43 @@ Usage:
     python3 02_gwas_preprocessing.py <exposure_gwas.csv> <outcome_gwas.csv> <output_filtered.csv>
 """
 
+#!/usr/bin/env python3
+
+"""
+MR-CoPe | GWAS Harmonisation & Filtering Script
+------------------------------------------------
+Author: Guillermo Comesaña & Christian Pepler
+Date: 2025
+
+Description:
+- Automatically detects GWAS column names
+- Filters & harmonises exposure and outcome GWAS summary statistics
+- Filters for SNPs in both datasets
+- Removes INDELs (keeps only SNPs with alleles A/T/C/G)
+- Filters weak SNPs (F-stat < 10)
+- Outputs a merged dataset ready for MR analysis
+
+Usage:
+    python3 02_gwas_preprocessing.py <exposure_gwas.csv> <outcome_gwas.csv> <output_filtered.csv>
+"""
+
 import sys
 import os
 import pandas as pd
+from scipy.stats import norm
 
 # ----------------- Auto Column Mapping ----------------- #
 
 AUTO_COLUMN_MAP = {
-    'SNP': ['snp', 'rsid', 'marker', 'rs_number'],
-    'CHR': ['chr', 'chromosome'],
+    'SNP': ['snp', 'rsid', 'marker', 'rs_number', 'rsids'],
+    'CHR': ['chr', 'chromosome', 'chrom'],
     'BP': ['bp', 'position', 'pos'],
-    'A1': ['a1', 'effect_allele', 'ea'],
-    'A2': ['a2', 'other_allele', 'oa'],
+    'A1': ['a1', 'effect_allele', 'ea', 'alt'],
+    'A2': ['a2', 'other_allele', 'oa', 'ref'],
     'BETA': ['beta', 'effect_size', 'b'],
     'SE': ['se', 'stderr', 'standard_error'],
     'PVALUE': ['pval', 'p_value', 'p'],
-    'EAF': ['eaf', 'effect_allele_freq', 'freq', 'riskfrequency']
+    'EAF': ['eaf', 'effect_allele_freq', 'freq', 'riskfrequency', 'maf']
 }
 
 def print_header():
@@ -90,6 +111,13 @@ def parse_custom_gwas(df, label):
 def is_snp_allele(a):
     return a in {"A", "T", "C", "G"}
 
+def infer_se_if_missing(df):
+    if "SE" not in df.columns and "BETA" in df.columns and "PVALUE" in df.columns:
+        print("🧠 Inferring SE from BETA and PVALUE...")
+        df["SE"] = abs(df["BETA"] / norm.ppf(df["PVALUE"] / 2))
+        df["SE"] = pd.to_numeric(df["SE"], errors="coerce")
+    return df
+
 def load_gwas(path, label):
     print(f"📥 Loading {label} GWAS: {path}")
     sep = "\t" if path.endswith((".tsv", ".txt")) else ","
@@ -106,8 +134,11 @@ def load_gwas(path, label):
             print(f"❌ ERROR: Missing critical columns in {label} GWAS and no fallback possible.")
             sys.exit(1)
     else:
-        df.rename(columns=mapping, inplace=True)
+        for std_col, original_col in mapping.items():
+            if std_col != original_col and original_col in df.columns:
+                df.rename(columns={original_col: std_col}, inplace=True)
 
+    df = infer_se_if_missing(df)
     return df
 
 def calculate_f_statistics(df):
@@ -159,7 +190,6 @@ def main():
 
     merged = pd.merge(exposure, outcome, on="SNP", suffixes=("_exp", "_out"))
 
-    # Patch column names so LD script works
     if "riskFrequency_exp" in merged.columns:
         merged.rename(columns={"riskFrequency_exp": "EAF_exp"}, inplace=True)
     if "riskFrequency_out" in merged.columns:
