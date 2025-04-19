@@ -14,6 +14,22 @@
 # Rscript 03_ld_pruning.R <input_filtered_SNPs.csv> <output_ld_pruned.csv>
 # ======================================================
 
+#!/usr/bin/env Rscript
+
+# ======================================================
+# MR-CoPe | LD Pruning Script
+# ======================================================
+# Author: Guillermo Comesaña & Christian Pepler
+# Date: 2025
+#
+# Description:
+# Removes SNPs in linkage disequilibrium (LD) using simulated genotypes
+# based on EAF, to avoid artificial LD in MR analyses.
+#
+# Usage:
+# Rscript 03_ld_pruning.R <input_filtered_SNPs.csv> <output_ld_pruned.csv>
+# ======================================================
+
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) != 2) {
   stop("Usage: Rscript 03_linkage_disequillibrium.R <input_filtered_SNPs.csv> <output_ld_pruned.csv>")
