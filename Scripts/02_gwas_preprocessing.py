@@ -18,26 +18,6 @@ Usage:
     python3 02_gwas_preprocessing.py <exposure_gwas.csv> <outcome_gwas.csv> <output_filtered.csv>
 """
 
-#!/usr/bin/env python3
-
-"""
-MR-CoPe | GWAS Harmonisation & Filtering Script
-------------------------------------------------
-Author: Guillermo Comesaña & Christian Pepler
-Date: 2025
-
-Description:
-- Automatically detects GWAS column names
-- Filters & harmonises exposure and outcome GWAS summary statistics
-- Filters for SNPs in both datasets
-- Removes INDELs (keeps only SNPs with alleles A/T/C/G)
-- Filters weak SNPs (F-stat < 10)
-- Outputs a merged dataset ready for MR analysis
-
-Usage:
-    python3 02_gwas_preprocessing.py <exposure_gwas.csv> <outcome_gwas.csv> <output_filtered.csv>
-"""
-
 import sys
 import os
 import pandas as pd
