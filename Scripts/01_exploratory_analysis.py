@@ -24,19 +24,20 @@ import sys
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.stats import norm
 
 # ----------------- Auto Column Mapping ----------------- #
 
 AUTO_COLUMN_MAP = {
-    'SNP': ['snp', 'rsid', 'marker', 'rs_number'],
-    'CHR': ['chr', 'chromosome'],
+    'SNP': ['snp', 'rsid', 'marker', 'rs_number', 'rsids'],
+    'CHR': ['chr', 'chromosome', 'chrom'],
     'BP': ['bp', 'position', 'pos'],
-    'A1': ['a1', 'effect_allele', 'ea'],
-    'A2': ['a2', 'other_allele', 'oa'],
+    'A1': ['a1', 'effect_allele', 'ea', 'alt'],
+    'A2': ['a2', 'other_allele', 'oa', 'ref'],
     'BETA': ['beta', 'effect_size', 'b'],
     'SE': ['se', 'stderr', 'standard_error'],
     'PVALUE': ['pval', 'p_value', 'p'],
-    'EAF': ['eaf', 'effect_allele_freq', 'freq', 'riskfrequency']
+    'EAF': ['eaf', 'effect_allele_freq', 'freq', 'riskfrequency', 'maf']
 }
 
 def auto_map_columns(df, label):
@@ -80,7 +81,7 @@ def parse_custom_gwas(df, label):
     return df
 
 def load_gwas(path, label):
-    print(f"📥 Loading {label} GWAS: {path}")
+    print(f"📅 Loading {label} GWAS: {path}")
     sep = "\t" if path.endswith((".tsv", ".txt")) else ","
     df = pd.read_csv(path, sep=sep)
     df.columns = df.columns.str.strip()
@@ -88,16 +89,21 @@ def load_gwas(path, label):
 
     mapping = auto_map_columns(df, label)
 
-    # If key columns missing → custom parsing
-    required = ["SNP", "CHR", "BP", "PVALUE"]
-    if not all(k in mapping for k in required):
+    if not all(k in mapping for k in ["SNP", "CHR", "BP", "PVALUE"]):
         if {"riskAllele", "locations", "pValue"}.issubset(df.columns):
             df = parse_custom_gwas(df, label)
         else:
             print(f"❌ ERROR: Missing critical columns in {label} GWAS and no fallback possible.")
             sys.exit(1)
     else:
-        df.rename(columns=mapping, inplace=True)
+        for std_col, actual_col in mapping.items():
+            if std_col != actual_col:
+                df.rename(columns={actual_col: std_col}, inplace=True)
+
+    if "BETA" in df.columns and "SE" in df.columns and "PVALUE" not in df.columns:
+        print("🧠 Computing PVALUE from BETA and SE...")
+        df["Z"] = df["BETA"] / df["SE"]
+        df["PVALUE"] = 2 * norm.sf(np.abs(df["Z"]))
 
     return df
 
@@ -110,6 +116,10 @@ def qc_report(df, label):
     print("\n")
 
 def manhattan_plot(df, output_path, title):
+    if "PVALUE" not in df.columns:
+        print(f"❌ Cannot plot Manhattan — PVALUE column missing in {title}.")
+        return
+
     df["-log10(PVALUE)"] = -np.log10(df["PVALUE"])
     chromosomes = sorted(df["CHR"].unique())
     colors = ["#1f77b4", "#d62728"] * (len(chromosomes) // 2 + 1)
@@ -119,9 +129,11 @@ def manhattan_plot(df, output_path, title):
 
     for i, chrom in enumerate(chromosomes):
         subset = df[df["CHR"] == chrom]
+        if subset.empty:
+            continue
         plt.scatter(subset["BP"] + x_offset, subset["-log10(PVALUE)"],
                     color=colors[i % 2], s=10, alpha=0.75, edgecolors="none")
-        x_labels.append(chrom)
+        x_labels.append(str(chrom))
         x_ticks.append(x_offset + (subset["BP"].max() - subset["BP"].min()) / 2)
         x_offset += subset["BP"].max() - subset["BP"].min() + 1
 
@@ -138,6 +150,29 @@ def manhattan_plot(df, output_path, title):
     plt.savefig(output_path, dpi=300)
     plt.close()
     print(f"✅ Manhattan plot saved: {output_path}\n")
+
+def qq_plot(df, output_path, title):
+    if "PVALUE" not in df.columns:
+        print(f"❌ Cannot plot Q-Q — PVALUE column missing in {title}.")
+        return
+
+    pvals = df["PVALUE"].dropna()
+    n = len(pvals)
+    expected = -np.log10(np.linspace(1 / (n + 1), 1, n))
+    observed = -np.log10(np.sort(pvals))
+
+    plt.figure(figsize=(8, 8), dpi=300)
+    plt.plot(expected, observed, marker='o', linestyle='none', markersize=3, alpha=0.6)
+    plt.plot([0, max(expected)], [0, max(expected)], linestyle='--', color='red', linewidth=1.5)
+
+    plt.xlabel("Expected -log10(P)", fontsize=14, fontweight="bold")
+    plt.ylabel("Observed -log10(P)", fontsize=14, fontweight="bold")
+    plt.title(title, fontsize=16, fontweight="bold")
+    plt.grid(True, linestyle=':', linewidth=0.7)
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300)
+    plt.close()
+    print(f"✅ Q-Q plot saved: {output_path}\n")
 
 def validate_inputs(exposure_path, outcome_path, output_dir):
     if not os.path.isfile(exposure_path):
@@ -168,9 +203,12 @@ def main():
     qc_report(exposure, "Exposure")
     qc_report(outcome, "Outcome")
 
-    print("📊 Generating Manhattan plots...\n")
+    print("📊 Generating Manhattan and Q-Q plots...\n")
     manhattan_plot(exposure, os.path.join(output_dir, "exposure_manhattan.png"), "Exposure GWAS Manhattan Plot")
     manhattan_plot(outcome, os.path.join(output_dir, "outcome_manhattan.png"), "Outcome GWAS Manhattan Plot")
+
+    qq_plot(exposure, os.path.join(output_dir, "exposure_qq.png"), "Exposure GWAS Q-Q Plot")
+    qq_plot(outcome, os.path.join(output_dir, "outcome_qq.png"), "Outcome GWAS Q-Q Plot")
 
     print("🎉 Exploratory analysis completed successfully!")
     print(f"All outputs saved in: {output_dir}\n")
