@@ -111,3 +111,5 @@ at least 50% of the total weight comes from valid instruments.
 $$
 Z_i = \beta_0 + \beta_1 \cdot SE_i^{-1} + \epsilon_i
 $$
+
+\beta_{Yi} = \beta_{IVW} \cdot \beta_{Xi} + \varepsilon_i
