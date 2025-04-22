@@ -58,6 +58,12 @@ echo ""
 echo "📦 Installing Python packages (if needed)..."
 pip install --quiet pandas numpy matplotlib seaborn scipy
 
+# --- Install R dependencies from local R script --- #
+echo ""
+echo "📦 Installing R packages (if needed)..."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+Rscript "${SCRIPT_DIR}/setup_r_dependencies.R"
+
 # --- Execute Nextflow Pipeline --- #
 echo ""
 echo "🚀 Launching MR-CoPe Pipeline..."
