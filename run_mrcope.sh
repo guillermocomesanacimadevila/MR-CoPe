@@ -62,7 +62,14 @@ pip install --quiet pandas numpy matplotlib seaborn scipy
 echo ""
 echo "📦 Installing R packages (if needed)..."
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-Rscript "${SCRIPT_DIR}/setup_r_dependencies.R"
+R_SCRIPT="${SCRIPT_DIR}/setup_r_dependencies.R"
+
+if [[ ! -f "$R_SCRIPT" ]]; then
+  echo "❌ ERROR: R setup script not found at: $R_SCRIPT"
+  exit 1
+fi
+
+Rscript "$R_SCRIPT"
 
 # --- Execute Nextflow Pipeline --- #
 echo ""
