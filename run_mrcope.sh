@@ -11,7 +11,7 @@
 #   user-supplied Exposure and Outcome GWAS summary statistics.
 ###############################################################################
 
-set -e  # Exit immediately if a command exits with a non-zero status.
+set -e  # Exit on error
 
 echo ""
 echo "🧬 Welcome to MR-CoPe: Mendelian Randomisation Pipeline"
@@ -37,39 +37,39 @@ echo "🔗 Exposure file: $EXPOSURE_PATH"
 echo "🔗 Outcome file : $OUTCOME_PATH"
 echo "--------------------------------------"
 
+# --- Ensure CMake is installed --- #
+echo ""
+echo "🔍 Checking for CMake..."
+if ! command -v cmake &> /dev/null; then
+  echo "🛠️  CMake not found. Installing via Homebrew..."
+  if ! command -v brew &> /dev/null; then
+    echo "❌ Homebrew is not installed. Please install it from https://brew.sh and rerun this script."
+    exit 1
+  fi
+  brew install cmake || { echo "❌ Failed to install CMake. Exiting."; exit 1; }
+else
+  echo "✅ CMake is already installed."
+fi
+
 # --- Conda Environment Setup --- #
 echo ""
 echo "🔧 Checking Conda environment..."
 
-if conda info --envs | grep -q "mrcope_env"; then
+source "$(conda info --base)/etc/profile.d/conda.sh"
+
+if conda env list | grep -q "mrcope_env"; then
   echo "⚠️  Conda env 'mrcope_env' already exists. Skipping creation."
 else
-  echo "🛠️  Creating Conda env 'mrcope_env'..."
-  conda create -y -n mrcope_env python=3.10 r-base=4.2
+  echo "🛠️  Creating Conda env from environment.yml..."
+  conda env create -f environment.yml
 fi
+
+echo "📦 Ensuring R packages (e.g. TwoSampleMR) are available..."
+conda run -n mrcope_env Rscript post_setup.R
 
 echo ""
 echo "✅ Activating environment..."
-source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate mrcope_env
-
-# --- Install Python dependencies --- #
-echo ""
-echo "📦 Installing Python packages (if needed)..."
-pip install --quiet pandas numpy matplotlib seaborn scipy
-
-# --- Install R dependencies from local R script --- #
-echo ""
-echo "📦 Installing R packages (if needed)..."
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-R_SCRIPT="${SCRIPT_DIR}/setup_r_dependencies.R"
-
-if [[ ! -f "$R_SCRIPT" ]]; then
-  echo "❌ ERROR: R setup script not found at: $R_SCRIPT"
-  exit 1
-fi
-
-Rscript "$R_SCRIPT"
 
 # --- Execute Nextflow Pipeline --- #
 echo ""
