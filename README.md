@@ -28,10 +28,6 @@ git clone https://github.com/guillermocomesanacimadevila/MR-CoPe.git
 ```
 
 ```bash
-cd MR-CoPe
-```
-
-```bash
 $($(find / -name nextflow -type f 2>/dev/null | head -n 1))
 ```
 
