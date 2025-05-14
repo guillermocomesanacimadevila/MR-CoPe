@@ -25,22 +25,23 @@
 suppressPackageStartupMessages({
   library(ggplot2)
   library(ggrepel)
-  library(TwoSampleMR)
   library(dplyr)
+  library(tibble)
+  library(TwoSampleMR)
 })
 
 # ---- Handle Arguments ----
 args <- commandArgs(trailingOnly = TRUE)
 
 if (length(args) != 2) {
-  stop("Usage: Rscript 06_visualisations.R <harmonised_data.csv> <output_dir>")
+  stop("Usage: Rscript 06_mr_scatter_plots.R <harmonised_data.csv> <output_dir>")
 }
 
 input_file <- args[1]
 output_dir <- args[2]
 
 cat("\n==============================================================\n")
-cat("MR-CoPe | MR Scatter + Leave-One-Out Plots\n")
+cat("MR-CoPe | Combined MR Scatter + Leave-One-Out\n")
 cat("==============================================================\n\n")
 
 if (!file.exists(input_file)) {
@@ -53,65 +54,91 @@ cat("📥 Loading harmonised data:", input_file, "\n")
 harmonised <- read.csv(input_file)
 cat("📊 SNPs available for plotting:", nrow(harmonised), "\n\n")
 
-# ---- General Scatter Plot Function ----
-create_plot <- function(data, method, intercept, slope, color, linetype, filename) {
-  p <- ggplot(data, aes(x = beta.exposure, y = beta.outcome)) +
-    geom_point(size = 3.5, color = "black") +
-    geom_text_repel(aes(label = SNP), size = 3.5, max.overlaps = 100) +
-    geom_abline(intercept = intercept, slope = slope, color = color, linetype = linetype, size = 1.2) +
-    labs(
-      title = paste("MR Scatter Plot -", method),
-      x = "SNP Effect on Exposure",
-      y = "SNP Effect on Outcome"
-    ) +
-    theme_minimal(base_size = 16)
+# ---- Fit MR Models ----
+cat("📊 Fitting MR models (IVW, Egger, WME)...\n")
+ivw_fit <- lm(beta.outcome ~ beta.exposure, data = harmonised)
+egger_fit <- lm(beta.outcome ~ beta.exposure, data = harmonised)
+wme_fit <- lm(beta.outcome ~ beta.exposure + 0, data = harmonised)
 
-  out_path <- file.path(output_dir, filename)
-  ggsave(out_path, p, width = 8, height = 6, dpi = 300)
-  cat("✅ Saved:", out_path, "\n")
-}
+# ---- Legend Data ----
+legend_df <- tibble(
+  x = c(NA, NA, NA),
+  y = c(NA, NA, NA),
+  method = factor(c("IVW", "Egger", "WME"), levels = c("IVW", "Egger", "WME")),
+  slope = c(coef(ivw_fit)[2], coef(egger_fit)[2], coef(wme_fit)[1]),
+  intercept = c(coef(ivw_fit)[1], coef(egger_fit)[1], 0)
+)
 
-# ---- IVW ----
-cat("📊 Creating IVW Scatter Plot...\n")
-ivw_model <- lm(beta.outcome ~ beta.exposure, data = harmonised)
-create_plot(harmonised, "IVW", coef(ivw_model)[1], coef(ivw_model)[2],
-            color = "blue", linetype = "solid", filename = "MR_Scatter_IVW.png")
+# ---- Combined Scatter Plot ----
+cat("📊 Creating combined MR scatter plot...\n")
 
-# ---- Egger ----
-cat("📊 Creating Egger Scatter Plot...\n")
-egger_model <- lm(beta.outcome ~ beta.exposure, data = harmonised)
-create_plot(harmonised, "Egger", coef(egger_model)[1], coef(egger_model)[2],
-            color = "red", linetype = "dashed", filename = "MR_Scatter_Egger.png")
+scatter_plot <- ggplot(harmonised, aes(x = beta.exposure, y = beta.outcome)) +
+  geom_errorbar(aes(ymin = beta.outcome - se.outcome,
+                    ymax = beta.outcome + se.outcome),
+                width = 0, color = "gray70", alpha = 0.7) +
+  geom_point(size = 1.7, shape = 21, fill = "black", color = "black", stroke = 0.2, alpha = 0.85) +
+  geom_hline(yintercept = 0, color = "black", linewidth = 0.4) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.4) +
+  geom_abline(aes(slope = slope, intercept = intercept, color = method, linetype = method),
+              data = legend_df, size = 1.1, show.legend = TRUE) +
+  labs(
+    title = "Combined MR Scatter Plot",
+    x = expression(beta[exposure]),
+    y = expression(beta[outcome]),
+    color = "Method",
+    linetype = "Method"
+  ) +
+  scale_color_manual(
+    values = c("IVW" = "#0072B2", "Egger" = "#D55E00", "WME" = "#009E73")
+  ) +
+  scale_linetype_manual(
+    values = c("IVW" = "solid", "Egger" = "dashed", "WME" = "dotdash")
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "top",
+    legend.title = element_blank(),
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    axis.title = element_text(size = 13),
+    panel.grid.major = element_line(color = "gray90"),
+    panel.grid.minor = element_blank()
+  )
 
-# ---- Weighted Median ----
-cat("📊 Creating Weighted Median Scatter Plot...\n")
-wme_model <- lm(beta.outcome ~ beta.exposure + 0, data = harmonised)
-create_plot(harmonised, "Weighted Median", intercept = 0, coef(wme_model)[1],
-            color = "darkgreen", linetype = "dotdash", filename = "MR_Scatter_WME.png")
+# ---- Save Combined Plot ----
+combined_path <- file.path(output_dir, "MR_Scatter_Combined.png")
+ggsave(combined_path, scatter_plot, width = 8.5, height = 6.5, dpi = 300)
+cat("✅ Saved:", combined_path, "\n")
 
+# ---- Leave-One-Out Plot ----
+cat("📊 Creating Leave-One-Out plot...\n")
 
-# ---- Leave-One-Out Analysis ----
-cat("📊 Performing Leave-One-Out analysis...\n")
+harmonised <- harmonised %>%
+  mutate(id.exposure = "Exposure", id.outcome = "Outcome")
 
-harmonised <- harmonised %>% mutate(id.exposure = "Exposure", id.outcome = "Outcome")
-res_loo <- mr_leaveoneout(harmonised)
-res_loo <- res_loo %>% filter(method == "Inverse variance weighted")
+res_loo <- mr_leaveoneout(harmonised) %>%
+  filter(method == "Inverse variance weighted")
 
 p_loo <- ggplot(res_loo, aes(x = b, y = reorder(SNP, b))) +
-  geom_point(size = 3) +
-  geom_errorbarh(aes(xmin = b - 1.96 * se, xmax = b + 1.96 * se), height = 0.25) +
+  geom_point(size = 2.5, shape = 21, fill = "black", color = "black", stroke = 0.3) +
+  geom_errorbarh(aes(xmin = b - 1.96 * se, xmax = b + 1.96 * se),
+                 height = 0.2, color = "gray40") +
   labs(
     title = "Leave-One-Out Analysis (IVW)",
-    x = "Causal Estimate (β)",
+    x = expression("Causal Estimate " * beta),
     y = "SNP"
   ) +
-  theme_minimal(base_size = 14)
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(size = 15, face = "bold", hjust = 0.5),
+    axis.title = element_text(size = 12),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_line(color = "gray90")
+  )
 
-out_loo <- file.path(output_dir, "MR_LeaveOneOut.png")
-ggsave(out_loo, p_loo, width = 9, height = 7, dpi = 300)
-cat("✅ Saved:", out_loo, "\n")
+loo_path <- file.path(output_dir, "MR_LeaveOneOut.png")
+ggsave(loo_path, p_loo, width = 9, height = 7, dpi = 300)
+cat("✅ Saved:", loo_path, "\n")
 
-
-cat("\n🎉 All visualisations completed!")
-cat("\nAll outputs saved in:", output_dir)
-cat("\n==============================================================\n\n")
+cat("\n🎉 All visualisations complete!\n")
+cat("All outputs saved in:", output_dir)
+cat("==============================================================\n\n")
