@@ -1,10 +1,21 @@
-## MR-CoPe Description 🧬🧬
+## 🧬 MR-CoPe: Mendelian Randomisation Automated Causal Pipeline Engine
 
-Guillermo Comesaña - MSc Bioinformatics @University of Bath
+A reproducible and scalable pipeline for Mendelian Randomisation analysis using summary-level GWAS data.
 
-Christian Pepler - MRes Bioscience @Cardiff University
+---
 
-## Tools & Languages
+### 👥 Authors
+
+- **Guillermo Comesaña**  
+  MSc Bioinformatics, *University of Bath*  
+
+- **Christian Pepler**  
+  MRes Bioscience, *Cardiff University*
+
+---
+
+### 🛠️ Tools & Languages
+
 <p align="left">
   <img src="https://github.com/user-attachments/assets/5e678fc0-9597-4252-98dd-eb9aaccc823e" alt="Python" width="60" style="margin: 0 10px;"/>
   <img src="https://github.com/user-attachments/assets/a49b35ad-c2f7-4cbe-b755-47ebe3330866" alt="R" width="72" style="margin: 0 10px; position: relative; top: -2px;"/>
@@ -14,31 +25,48 @@ Christian Pepler - MRes Bioscience @Cardiff University
   <img src="https://github.com/user-attachments/assets/0427f54d-9e05-4969-91d1-13af16c3fb42" alt="SQL" width="100" style="margin: 0 10px;"/>
 </p>
 
-Bioinformatics 💻 / Data Science 📈 / Genetic Epidemiology 🧬
+---
 
-## What is Mendelian Randomisation
+### 🔬 Focus Areas
 
-<img src="https://github.com/user-attachments/assets/8f2e8edc-e66d-44e6-86c0-1da112b27dd1" width="600" />
+- **Bioinformatics** 💻  
+- **Data Science & Statistical Inference** 📈  
+- **Genetic Epidemiology & Causal Inference** 🧬  
 
+---
 
-## Run Pipeline -> (UNIX-based)
-To run the pipeline, clone the repo, and give the script execute permission and run it:
+## 🧬 What is Mendelian Randomisation?
+
+<img src="https://github.com/user-attachments/assets/8f2e8edc-e66d-44e6-86c0-1da112b27dd1" width="600" alt="Mendelian Randomisation Diagram" />
+
+**Mendelian Randomisation (MR)** is a method that uses genetic variants as natural experiments (instrumental variables) to estimate the causal effect of a modifiable exposure (e.g., LDL cholesterol, iodine, fatty acids) on an outcome (e.g., Alzheimer’s disease). It leverages the random allocation of alleles at conception, mimicking the properties of a randomized controlled trial.
+
+---
+
+## 🚀 Run the Pipeline 
+
+Follow the steps below to set up and run the MR-CoPe pipeline.
+
+### 1. Clone the Repository
 
 ```bash
 git clone https://github.com/guillermocomesanacimadevila/MR-CoPe.git
+cd MR-CoPe
 ```
+
+### 2. Ensure Nextflow is Available
 
 ```bash
 $($(find / -name nextflow -type f 2>/dev/null | head -n 1))
 ```
 
-```bash
-cd ~/MR-CoPe
-```
+### 3. Run the Pipeline
 
 ```bash
 chmod +x run_mrcope.sh && ./run_mrcope.sh
 ```
+
+---
 
 ## 🔧 System Requirements
 
@@ -51,7 +79,10 @@ chmod +x run_mrcope.sh && ./run_mrcope.sh
 | Docker     | ≥ 20.10         |
 | Terminal   | UNIX-based      |
 
-## Pipeline Workflow
+---
+
+## 🧪 Pipeline Workflow
+
 
 ## 🧪 Data Validation
 
