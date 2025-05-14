@@ -209,3 +209,19 @@ Where:
 A significant intercept indicates directional pleiotropy bias.
 
 ---
+
+## 📊 Causal Effect Estimation: IVW vs. WME vs. MR-Egger
+
+This plot visualizes all three Mendelian Randomisation (MR) methods estimating the causal effect.
+
+![IVW vs WME vs Egger](https://github.com/user-attachments/assets/91b3ba23-4560-407a-ae52-39545bda4dbb)
+
+### 📌 Interpretation
+
+- **Red line** – *Inverse-Variance Weighted (IVW)*
+- **Green line** – *Weighted Median Estimator (WME)*
+- **Blue line** – *MR-Egger Regression*
+- **Orange dashed line** – *MR-Egger intercept*
+- **Data points**: Each dot represents a single SNP's ratio estimate (β_Yi / β_Xi), with **bubble size** reflecting inverse-variance weight (1/SE²).
+
+---
