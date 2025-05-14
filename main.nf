@@ -6,9 +6,6 @@ nextflow.enable.dsl=2
 params.output_dir  = "./results"
 params.script_dir  = "./"  // Folder where your scripts are located
 
-// Helper to run R scripts inside the Conda env (safe for macOS)
-def conda_run = 'conda run -n mrcope_env'
-
 // SCRIPTS
 workflow {
 
@@ -92,7 +89,7 @@ process ld_filtering {
 
     script:
     """
-    ${conda_run} Rscript ${script} ${filtered} ld_pruned_SNPs.csv
+    Rscript ${script} ${filtered} ld_pruned_SNPs.csv
     """
 }
 
@@ -110,7 +107,7 @@ process mr_analysis {
 
     script:
     """
-    ${conda_run} Rscript ${script} ${pruned}
+    Rscript ${script} ${pruned}
     """
 }
 
@@ -144,9 +141,10 @@ process visualisation_scatter {
     path("MR_Scatter_IVW.png")
     path("MR_Scatter_Egger.png")
     path("MR_Scatter_WME.png")
+    path("MR_LeaveOneOut.png")
 
     script:
     """
-    ${conda_run} Rscript ${script} ${harmonised} ${params.output_dir}
+    Rscript ${script} ${harmonised} ${params.output_dir}
     """
 }
