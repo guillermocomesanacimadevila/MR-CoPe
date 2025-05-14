@@ -1,30 +1,30 @@
 #!/bin/bash
 
 ###############################################################################
-#                        MR-CoPe Pipeline Runner                              #
+#                        MR-CoPe Pipeline Runner (Docker Version)             #
 ###############################################################################
 # Usage:
 #   chmod +x run_mrcope.sh && ./run_mrcope.sh
 #
 # Description:
-#   This script sets up the environment and runs the MR-CoPe pipeline using 
-#   user-supplied Exposure and Outcome GWAS summary statistics.
+#   This script launches the MR-CoPe pipeline using Docker and Nextflow.
+#   It prompts the user for GWAS input files and executes the full workflow.
 ###############################################################################
 
-set -e  # Exit on error
+set -e  # Exit on any error
 
 echo ""
 echo "🧬 Welcome to MR-CoPe: Mendelian Randomisation Pipeline"
 echo "--------------------------------------------------------"
 
-# --- Prompt for Exposure file --- #
+# ------------------------ Input Collection ------------------------
+
 read -rp "📥 Enter path to Exposure GWAS summary statistics (.csv or .tsv): " EXPOSURE_PATH
 if [[ ! -f "$EXPOSURE_PATH" ]]; then
   echo "❌ ERROR: Exposure file not found at: $EXPOSURE_PATH"
   exit 1
 fi
 
-# --- Prompt for Outcome file --- #
 read -rp "📥 Enter path to Outcome GWAS summary statistics (.csv or .tsv): " OUTCOME_PATH
 if [[ ! -f "$OUTCOME_PATH" ]]; then
   echo "❌ ERROR: Outcome file not found at: $OUTCOME_PATH"
@@ -32,51 +32,55 @@ if [[ ! -f "$OUTCOME_PATH" ]]; then
 fi
 
 echo ""
-echo "--------------------------------------"
-echo "🔗 Exposure file: $EXPOSURE_PATH"
-echo "🔗 Outcome file : $OUTCOME_PATH"
-echo "--------------------------------------"
+echo "📁 Exposure: $EXPOSURE_PATH"
+echo "📁 Outcome : $OUTCOME_PATH"
+echo "--------------------------------------------------------"
 
-# --- Ensure CMake is installed --- #
-echo ""
-echo "🔍 Checking for CMake..."
-if ! command -v cmake &> /dev/null; then
-  echo "🛠️  CMake not found. Installing via Homebrew..."
-  if ! command -v brew &> /dev/null; then
-    echo "❌ Homebrew is not installed. Please install it from https://brew.sh and rerun this script."
+# ------------------------ Dependency Checks ------------------------
+
+echo "🔍 Checking for Docker..."
+if ! command -v docker &> /dev/null; then
+  echo "❌ Docker is not installed. Please install it from https://www.docker.com and rerun this script."
+  exit 1
+fi
+echo "✅ Docker is installed."
+
+echo "🔍 Checking for Nextflow..."
+if ! command -v nextflow &> /dev/null; then
+  echo "❌ Nextflow is not installed. Please install it from https://www.nextflow.io and rerun this script."
+  exit 1
+fi
+echo "✅ Nextflow is installed."
+
+# ------------------------ Docker Image Check ------------------------
+
+IMAGE_NAME="mrcope:latest"
+if ! docker image inspect "$IMAGE_NAME" > /dev/null 2>&1; then
+  echo ""
+  echo "🐳 Docker image '$IMAGE_NAME' not found locally."
+  read -rp "🔧 Would you like to build it now from Dockerfile? [y/N]: " BUILD_CHOICE
+  if [[ "$BUILD_CHOICE" =~ ^[Yy]$ ]]; then
+    docker build -t "$IMAGE_NAME" .
+    echo "✅ Docker image '$IMAGE_NAME' built successfully."
+  else
+    echo "❌ Cannot continue without Docker image '$IMAGE_NAME'. Exiting."
     exit 1
   fi
-  brew install cmake || { echo "❌ Failed to install CMake. Exiting."; exit 1; }
-else
-  echo "✅ CMake is already installed."
 fi
 
-# --- Conda Environment Setup --- #
-echo ""
-echo "🔧 Checking Conda environment..."
-
-source "$(conda info --base)/etc/profile.d/conda.sh"
-
-if conda env list | grep -q "mrcope_env"; then
-  echo "⚠️  Conda env 'mrcope_env' already exists. Skipping creation."
-else
-  echo "🛠️  Creating Conda env from environment.yml..."
-  conda env create -f environment.yml
-fi
-
-echo "📦 Ensuring R packages (e.g. TwoSampleMR) are available..."
-conda run -n mrcope_env Rscript post_setup.R
+# ------------------------ Run Pipeline ------------------------
 
 echo ""
-echo "✅ Activating environment..."
-conda activate mrcope_env
+echo "🚀 Launching MR-CoPe Pipeline with Docker..."
+nextflow run main.nf -with-docker "$IMAGE_NAME" \
+    --exposure "$EXPOSURE_PATH" \
+    --outcome "$OUTCOME_PATH" \
+    --output_dir "./results" \
+    -resume
 
-# --- Execute Nextflow Pipeline --- #
-echo ""
-echo "🚀 Launching MR-CoPe Pipeline..."
-nextflow run main.nf --exposure "$EXPOSURE_PATH" --outcome "$OUTCOME_PATH" -resume
+# ------------------------ Completion Message ------------------------
 
 echo ""
 echo "🎉 MR-CoPe Pipeline completed successfully!"
-echo "✨ All outputs are located in: ./results/"
+echo "📦 Results are available in: ./results/"
 echo "--------------------------------------------------------"
