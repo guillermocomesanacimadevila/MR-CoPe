@@ -25,6 +25,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import norm
+from scipy import stats
 
 # ----------------- Auto Column Mapping ----------------- #
 
@@ -179,25 +180,53 @@ def manhattan_plot(df, output_path, title):
     print(f"✅ Manhattan plot saved: {output_path}\n")
     
 def qq_plot(df, output_path, title):
+
     if "PVALUE" not in df.columns:
         print(f"❌ Cannot plot Q-Q — PVALUE column missing in {title}.")
         return
 
+    # Clean and sort p-values
     pvals = df["PVALUE"].dropna()
+    pvals = np.clip(pvals, 1e-300, 1.0)
     n = len(pvals)
     expected = -np.log10(np.linspace(1 / (n + 1), 1, n))
     observed = -np.log10(np.sort(pvals))
 
-    plt.figure(figsize=(8, 8), dpi=300)
-    plt.plot(expected, observed, marker='o', linestyle='none', markersize=3, alpha=0.6)
-    plt.plot([0, max(expected)], [0, max(expected)], linestyle='--', color='red', linewidth=1.5)
+    # Confidence interval (95%) under null
+    quantiles = np.arange(1, n + 1) / (n + 1)
+    ci_low = -np.log10(stats.beta.ppf(0.025, quantiles * n, (1 - quantiles) * n))
+    ci_high = -np.log10(stats.beta.ppf(0.975, quantiles * n, (1 - quantiles) * n))
 
-    plt.xlabel("Expected -log10(P)", fontsize=14, fontweight="bold")
-    plt.ylabel("Observed -log10(P)", fontsize=14, fontweight="bold")
-    plt.title(title, fontsize=16, fontweight="bold")
-    plt.grid(True, linestyle=':', linewidth=0.7)
+    # Genomic inflation factor (lambda GC)
+    chisq = stats.chi2.isf(pvals, df=1)
+    lambda_gc = np.median(chisq) / stats.chi2.ppf(0.5, df=1)
+
+    # Color gradient
+    cmap = plt.cm.viridis_r
+    colors = cmap(np.linspace(0.1, 0.85, n))
+
+    # Plot
+    plt.figure(figsize=(7.5, 7.5), dpi=400)
+    plt.fill_between(expected, ci_low, ci_high, color="#EAEAF2", alpha=0.6, label="95% CI")
+    plt.scatter(expected, observed, c=colors, s=10, edgecolor='none', alpha=0.8, label="Observed p-values")
+    plt.plot([0, max(expected)], [0, max(expected)], linestyle="--", color="black", linewidth=1.3)
+
+    plt.xlabel(r"Expected $-\log_{10}$(P)", fontsize=13, weight="bold")
+    plt.ylabel(r"Observed $-\log_{10}$(P)", fontsize=13, weight="bold")
+    plt.title(title, fontsize=16, weight="bold", pad=10)
+
+    plt.text(0.95, 0.05, f"$\\lambda_{{GC}}$ = {lambda_gc:.3f}",
+             transform=plt.gca().transAxes, fontsize=11,
+             ha="right", va="bottom",
+             bbox=dict(facecolor='white', edgecolor='gray', boxstyle='round,pad=0.4'))
+
+    plt.grid(True, linestyle=':', linewidth=0.5, alpha=0.6)
+    plt.xticks(fontsize=11)
+    plt.yticks(fontsize=11)
+    plt.legend(frameon=False, fontsize=10, loc="upper left")
+
     plt.tight_layout()
-    plt.savefig(output_path, dpi=300)
+    plt.savefig(output_path, dpi=400)
     plt.close()
     print(f"✅ Q-Q plot saved: {output_path}\n")
 
