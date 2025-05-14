@@ -53,15 +53,27 @@ chmod +x run_mrcope.sh && ./run_mrcope.sh
 
 ## Pipeline Workflow
 
-### Data Validation (Synthetic GWAS)
+## 🧪 Data Validation
 
-### Data Validation (Real GWAS)
+To assess the robustness and reliability of the causal inference pipeline, validation was performed using both synthetic and real genome-wide association study (GWAS) datasets.
 
-#### MR(1)
-SNPs -> LDl-c -> Alzheimer´s Disease Risk
+---
 
-#### MR(2)
-SNPs -> Iodine-c -> Alzheimer´s Disease Risk
+### 📊 Synthetic GWAS Validation
+
+Synthetic GWAS datasets were generated to simulate known causal effects. These datasets serve as a testbed for verifying the performance and bias characteristics of the Mendelian Randomisation (MR) estimators under controlled conditions (e.g., varying instrument strength, sample size, and pleiotropy).
+
+---
+
+### 📈 Real GWAS Validation
+
+#### MR(1): Fatty Acids → Alzheimer’s Disease Risk
+
+This MR analysis evaluates the potential **causal effect of genetically predicted circulating fatty acid levels** (e.g., LDL-C, omega-3) on the **risk of Alzheimer’s Disease (AD)**.
+
+This analysis helps validate the pipeline in a real-world, biologically relevant context.
+
+---
 
 ## 🔍 Mendelian Randomisation – Statistical Methods
 
