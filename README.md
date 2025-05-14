@@ -63,58 +63,108 @@ SNPs -> LDl-c -> Alzheimer´s Disease Risk
 #### MR(2)
 SNPs -> Iodine-c -> Alzheimer´s Disease Risk
 
-### Mendelian Randomisation -> Statistical Methods
+## 🔍 Mendelian Randomisation – Statistical Methods
 
-#### 📐 Inverse-Variance Weighted (IVW) Estimator
+Mendelian Randomisation (MR) uses genetic variants as instrumental variables (IVs) to estimate the causal effect of an exposure on an outcome. Below are the main estimators used in two-sample MR, including assumptions and derivations.
 
-The IVW method estimates the causal effect (β_IVW) by performing a weighted regression of 
-SNP-outcome effects (β_Yi) on SNP-exposure effects (β_Xi), **without an intercept**:
+---
+
+### 📐 Inverse-Variance Weighted (IVW) Estimator
+
+The IVW estimator assumes all instruments are valid (i.e., no pleiotropy). It regresses the SNP-outcome associations (β_Yi) on SNP-exposure associations (β_Xi), **without an intercept**:
 
     β_Yi = β_IVW · β_Xi + ε_i
 
-To obtain β_IVW, we minimize the weighted sum of squared residuals:
+To estimate β_IVW, we minimize the weighted sum of squared residuals:
+
+    ∑ w_i · (β_Yi - β_IVW · β_Xi)²
+
+The closed-form solution is:
 
              ⎡  ∑ (w_i · β_Xi · β_Yi) ⎤
     β_IVW = ⎢ ------------------------ ⎥
              ⎣   ∑ (w_i · β_Xi²)      ⎦
 
-Where the weights are defined as the inverse variance of the outcome effect estimates:
+Where the weights are the inverse variance of the outcome effects:
 
     w_i = 1 / SE_Yi²
 
-#### 🧮 Weighted Median Estimator (WME)
+---
 
-The Weighted Median Estimator provides a consistent causal effect estimate 
-even when up to 50% of the instruments are invalid.
+### 🧮 Weighted Median Estimator (WME)
 
-Given a set of ratio estimates:
+The Weighted Median Estimator gives a consistent estimate even when up to 50% of the instruments are invalid.
+
+For each SNP, the ratio estimate is:
 
     β_i = β_Yi / β_Xi
 
-Each estimate is weighted by the inverse variance of β_Yi:
+And the weights are:
 
     w_i = 1 / SE_Yi²
 
-The WME is the **median** of the β_i values, ordered and weighted by w_i.
+The estimator computes the **weighted median** of the β_i values — the value where 50% of the total weight lies on either side. This is robust to violations of the exclusion restriction, as long as over 50% of the total weight comes from valid instruments.
 
-This method is robust to violations of the exclusion restriction, assuming that
-at least 50% of the total weight comes from valid instruments.
+---
 
-#### 📐 MR-Egger Regression
+### 📐 MR-Egger Regression
 
-### Genetic Instrument Strength
+MR-Egger extends the IVW approach by including an intercept to account for directional (unbalanced) pleiotropy:
 
-#### F-statistic
+    β_Yi = α + β_Egger · β_Xi + ε_i
 
-### Heterogeneity and Horizontal Pleiotropy
+Where:
+- α is the **intercept**, which captures the average pleiotropic effect
+- β_Egger is the **causal effect estimate**, corrected for pleiotropy
 
-#### Cochran Q Statistic + p-Val -> IVW/WME
+This method relies on the **InSIDE** assumption: the Instrument Strength is Independent of the Direct Effect.
 
-#### I2 Statistic -> MR-Egger
+---
 
-#### Egger Intercept 
-$$
-Z_i = \beta_0 + \beta_1 \cdot SE_i^{-1} + \epsilon_i
-$$
+## 📊 Instrument Strength
 
-\beta_{Yi} = \beta_{IVW} \cdot \beta_{Xi} + \varepsilon_i
+### F-statistic (per SNP)
+
+Used to assess the strength of the genetic instruments:
+
+    F = (β_Xi²) / (SE_Xi²)
+
+A rule of thumb: F > 10 suggests the instrument is strong.
+
+---
+
+## 🔬 Heterogeneity & Pleiotropy Tests
+
+### Cochran’s Q Statistic
+
+Assesses heterogeneity among SNP-specific causal estimates:
+
+    Q = ∑ w_i · (β_Yi - β_IVW · β_Xi)²
+
+Large Q suggests potential invalid instruments or pleiotropy.
+
+---
+
+### I² Statistic (MR-Egger)
+
+Measures heterogeneity in instrument strength:
+
+    I² = 1 - (1 / mean(F))
+
+Low I² may indicate regression dilution bias in MR-Egger.
+
+---
+
+### MR-Egger Intercept Test
+
+Used to detect **directional pleiotropy**:
+
+    Z_i = α + β_Egger · (1 / SE_i) + ε_i
+
+Where:
+- Z_i is the standardized SNP-outcome effect
+- α is the Egger intercept (should be ≈ 0 under no pleiotropy)
+
+A significant intercept indicates directional pleiotropy bias.
+
+---
