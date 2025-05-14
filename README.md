@@ -32,6 +32,14 @@ cd MR-CoPe
 ```
 
 ```bash
+$($(find / -name nextflow -type f 2>/dev/null | head -n 1))
+```
+
+```bash
+cd ~/MR-CoPe
+```
+
+```bash
 chmod +x run_mrcope.sh && ./run_mrcope.sh
 ```
 
