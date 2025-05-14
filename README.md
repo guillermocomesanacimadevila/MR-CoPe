@@ -40,16 +40,16 @@ cd ~/MR-CoPe
 chmod +x run_mrcope.sh && ./run_mrcope.sh
 ```
 
-## System Requirements ->
-** UNIX-based terminal ** 
+## 🔧 System Requirements
 
-** Python3 > 3.10 **
-
-** R > 4.31 ** 
-
-** Java > 17.00 **
-
-** Nextflow > 24.11.0 ** 
+| Tool       | Minimum Version |
+|------------|-----------------|
+| Python     | ≥ 3.10          |
+| R          | ≥ 4.3.1         |
+| Java       | ≥ 17.0          |
+| Nextflow   | ≥ 24.11.0       |
+| Docker     | ≥ 20.10         |
+| Terminal   | UNIX-based      |
 
 ## Pipeline Workflow
 
