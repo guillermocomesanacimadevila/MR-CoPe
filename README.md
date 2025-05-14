@@ -18,7 +18,8 @@ Bioinformatics 💻 / Data Science 📈 / Genetic Epidemiology 🧬
 
 ## What is Mendelian Randomisation
 
-![1-s2 0-S0753332222003419-gr1](https://github.com/user-attachments/assets/b51c516e-c858-4d13-8529-8683abdf1e09)
+![fcvm-05-00051-g001](https://github.com/user-attachments/assets/8f2e8edc-e66d-44e6-86c0-1da112b27dd1)
+
 
 ## Run Pipeline -> (UNIX-based)
 To run the pipeline, clone the repo, and give the script execute permission and run it:
