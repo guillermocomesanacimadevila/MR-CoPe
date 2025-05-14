@@ -37,7 +37,7 @@ A reproducible and scalable pipeline for Mendelian Randomisation analysis using 
 
 <img src="https://github.com/user-attachments/assets/8f2e8edc-e66d-44e6-86c0-1da112b27dd1" width="600" alt="Mendelian Randomisation Diagram" />
 
-**Mendelian Randomisation (MR)** is a method that uses genetic variants as natural experiments (instrumental variables) to estimate the causal effect of a modifiable exposure (e.g., LDL cholesterol, iodine, fatty acids) on an outcome (e.g., Alzheimer’s disease). It leverages the random allocation of alleles at conception, mimicking the properties of a randomized controlled trial.
+**Mendelian Randomisation (MR)** is a method that uses genetic variants as natural experiments (instrumental variables) to estimate the causal effect of a modifiable exposure (e.g., LDL cholesterol, iodine, fatty acids) on an outcome (e.g., Alzheimer’s disease). It leverages the random allocation of alleles at conception, mimicking the properties of a randomised controlled trial.
 
 ---
 
