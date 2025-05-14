@@ -214,7 +214,7 @@ A significant intercept indicates directional pleiotropy bias.
 
 This plot visualizes all three Mendelian Randomisation (MR) methods estimating the causal effect.
 
-![IVW vs WME vs Egger](https://github.com/user-attachments/assets/91b3ba23-4560-407a-ae52-39545bda4dbb)
+<img src="https://github.com/user-attachments/assets/91b3ba23-4560-407a-ae52-39545bda4dbb" width="600" alt="IVW vs WME vs Egger"/>
 
 ### 📌 Interpretation
 
