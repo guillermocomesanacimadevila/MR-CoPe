@@ -18,7 +18,7 @@ Bioinformatics 💻 / Data Science 📈 / Genetic Epidemiology 🧬
 
 ## What is Mendelian Randomisation
 
-<img src="https://github.com/user-attachments/assets/8f2e8edc-e66d-44e6-86c0-1da112b27dd1" width="400" />
+<img src="https://github.com/user-attachments/assets/8f2e8edc-e66d-44e6-86c0-1da112b27dd1" width="600" />
 
 
 ## Run Pipeline -> (UNIX-based)
