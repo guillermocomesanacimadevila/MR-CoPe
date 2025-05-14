@@ -1,95 +1,108 @@
 #!/usr/bin/env Rscript
 
-# ======================================================
-# MR-CoPe | LD Pruning Script
-# ======================================================
-# Author: Guillermo Comesaña & Christian Pepler
-# Date: 2025
+# ===================================================================
+# MR-CoPe | Linkage Disequilibrium Pruning (Real LD Clumping)
+# ===================================================================
+# Authors: Guillermo Comesaña & Christian Pepler
 #
 # Description:
-# Removes SNPs in linkage disequilibrium (LD) using simulated genotypes
-# based on EAF, to avoid artificial LD in MR analyses.
+# Performs LD pruning using real linkage disequilibrium structure via
+# the TwoSampleMR::ld_clump() function, using the 1000 Genomes EUR panel.
 #
 # Usage:
-# Rscript 03_ld_pruning.R <input_filtered_SNPs.csv> <output_ld_pruned.csv>
-# ======================================================
-
-#!/usr/bin/env Rscript
-
-# ======================================================
-# MR-CoPe | LD Pruning Script
-# ======================================================
-# Author: Guillermo Comesaña & Christian Pepler
-# Date: 2025
+#   Rscript 03_linkage_disequillibrium.R <input_filtered_SNPs.csv> <output_ld_pruned.csv>
 #
-# Description:
-# Removes SNPs in linkage disequilibrium (LD) using simulated genotypes
-# based on EAF, to avoid artificial LD in MR analyses.
-#
-# Usage:
-# Rscript 03_ld_pruning.R <input_filtered_SNPs.csv> <output_ld_pruned.csv>
-# ======================================================
+# Notes:
+# - Requires 'SNP' and 'PVALUE_exp' columns in the input file
+# - Uses 10,000 kb window, r2 = 0.001 threshold
+# - Requires internet access unless reference LD data are cached
+# ===================================================================
+
+suppressPackageStartupMessages({
+  library(TwoSampleMR)
+  library(dplyr)
+  library(readr)
+})
+
+# ------------------ Parse Arguments ------------------ #
 
 args <- commandArgs(trailingOnly = TRUE)
+
 if (length(args) != 2) {
-  stop("Usage: Rscript 03_linkage_disequillibrium.R <input_filtered_SNPs.csv> <output_ld_pruned.csv>")
+  cat("\n❌ ERROR: Incorrect number of arguments.\n")
+  cat("Usage: Rscript 03_linkage_disequillibrium.R <input_filtered_SNPs.csv> <output_ld_pruned.csv>\n\n")
+  quit(status = 1)
 }
 
 input_file  <- args[1]
 output_file <- args[2]
 
-cat("\n==============================================================\n")
-cat("MR-CoPe | Linkage Disequilibrium Pruning\n")
-cat("==============================================================\n\n")
+# ------------------ Banner ------------------ #
 
-cat("📥 Loading filtered SNPs file:", input_file, "\n")
-gwas <- read.csv(input_file)
-cat("📊 Input SNPs:", nrow(gwas), "\n\n")
+cat("\n==================================================================\n")
+cat("MR-CoPe | Linkage Disequilibrium Pruning (LD Clumping via TwoSampleMR)\n")
+cat("==================================================================\n\n")
 
-# Try to cast alleles to characters
-allele_cols <- c("A1_exp", "A2_exp", "A1_out", "A2_out")
-tryCatch({
-  gwas[allele_cols] <- lapply(gwas[allele_cols], as.character)
+# ------------------ Load Data ------------------ #
+
+cat("📥 Reading input summary statistics from:\n  →", input_file, "\n")
+
+if (!file.exists(input_file)) {
+  stop(paste0("❌ Input file not found: ", input_file))
+}
+
+gwas <- read_csv(input_file, show_col_types = FALSE)
+cat("📊 SNPs loaded:", nrow(gwas), "\n\n")
+
+# ------------------ Validate Required Columns ------------------ #
+
+required_cols <- c("SNP", "PVALUE_exp")
+
+missing <- setdiff(required_cols, colnames(gwas))
+if (length(missing) > 0) {
+  stop(paste0("❌ Missing required columns in input: ", paste(missing, collapse = ", ")))
+}
+
+# ------------------ Prepare Input for Clumping ------------------ #
+
+cat("🧬 Preparing input for LD clumping...\n")
+clump_input <- gwas %>%
+  transmute(
+    rsid = SNP,
+    pval = PVALUE_exp,
+    id = "exposure",   # Required by ld_clump
+    chr = NA,
+    pos = NA
+  )
+
+# ------------------ Perform Clumping ------------------ #
+
+cat("🔗 Performing LD clumping with parameters:\n")
+cat("   ➤ Window     : 10,000 kb\n")
+cat("   ➤ R² cutoff  : 0.001\n")
+cat("   ➤ P-value    : 1.0 (include all SNPs)\n\n")
+
+clumped <- tryCatch({
+  ld_clump(
+    clump_input,
+    clump_kb = 10000,
+    clump_r2 = 0.001,
+    clump_p = 1.0
+  )
 }, error = function(e) {
-  cat("⚠️ Not all allele columns found. Skipping allele type casting...\n\n")
+  cat("❌ ERROR during clumping:\n", e$message, "\n")
+  quit(status = 1)
 })
 
-# Check and convert EAF column
-if (!"EAF_exp" %in% names(gwas)) {
-  stop("❌ ERROR: Column 'EAF_exp' not found in the input. Genotype simulation requires this column.")
-}
+# ------------------ Filter and Save Results ------------------ #
 
-cat("🧪 Checking EAF_exp column values...\n")
-gwas$EAF_exp <- suppressWarnings(as.numeric(gwas$EAF_exp))  # Force to numeric
-gwas <- gwas[!is.na(gwas$EAF_exp) & gwas$EAF_exp > 0 & gwas$EAF_exp < 1, ]
-cat("✅ Valid EAF SNPs retained:", nrow(gwas), "\n\n")
+gwas_pruned <- gwas %>% filter(SNP %in% clumped$rsid)
 
-# Simulate genotypes from EAF
-set.seed(42)
-simulate_genotypes <- function(eaf, n = 100000) {
-  probs <- c((1 - eaf)^2, 2 * eaf * (1 - eaf), eaf^2)
-  sample(0:2, size = n, replace = TRUE, prob = probs)
-}
+cat("✅ SNPs retained after LD clumping:", nrow(gwas_pruned), "\n")
+cat("🚫 SNPs removed due to LD:", nrow(gwas) - nrow(gwas_pruned), "\n")
 
-cat("🧬 Simulating genotypes for LD calculation (n = 100,000)...\n")
-geno_list <- lapply(gwas$EAF_exp, simulate_genotypes)
-geno_matrix <- do.call(rbind, geno_list)
-rownames(geno_matrix) <- gwas$SNP
+cat("\n💾 Writing pruned dataset to:\n  →", output_file, "\n")
+write_csv(gwas_pruned, output_file)
 
-# Compute pairwise LD (r²) matrix
-cat("🔗 Calculating pairwise LD matrix (r²)...\n")
-ld_r2 <- cor(t(geno_matrix))^2
-ld_r2[upper.tri(ld_r2, diag = TRUE)] <- NA
-
-# Prune SNPs with high LD
-cat("🧹 Pruning SNPs with any r² ≥ 0.001...\n")
-keep_idx <- which(apply(ld_r2, 1, function(row) all(is.na(row) | row < 0.001)))
-gwas_pruned <- gwas[keep_idx, ]
-
-cat("✅ SNPs retained after LD pruning:", nrow(gwas_pruned), "\n")
-cat("🚫 SNPs removed:", nrow(gwas) - nrow(gwas_pruned), "\n\n")
-
-# Save result
-write.csv(gwas_pruned, output_file, row.names = FALSE)
-cat("💾 LD-pruned SNP dataset saved to:", output_file, "\n")
-cat("==============================================================\n\n")
+cat("\n✅ LD pruning complete.\n")
+cat("==================================================================\n\n")
