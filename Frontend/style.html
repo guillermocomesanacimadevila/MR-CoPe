@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>🧬 MR-CoPe Results Report</title>
+
+  <!-- Aesthetic Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700&display=swap" rel="stylesheet"/>
+
+  <!-- DataTables CSS -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.5/css/jquery.dataTables.min.css"/>
+
+  <!-- Plotly -->
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+  <!-- jQuery + DataTables -->
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.5/js/jquery.dataTables.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      margin: 2rem auto;
+      max-width: 960px;
+      background: #f9f9fb;
+      color: #333;
+      padding: 1rem;
+      line-height: 1.6;
+    }
+
+    h1, h2, h3 {
+      color: #1f2d3d;
+    }
+
+    .section {
+      margin-bottom: 3rem;
+      padding: 1.5rem;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 0 12px rgba(0,0,0,0.05);
+    }
+
+    .dataTables_wrapper {
+      margin-top: 1rem;
+    }
+
+    .footer {
+      margin-top: 4rem;
+      font-size: 0.9rem;
+      color: #888;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>🧬 MR-CoPe Report</h1>
+  <p><strong>Date:</strong> <span id="today"></span></p>
+
+  <div class="section">
+    <h2>📊 SNP Summary Table</h2>
+    <table id="snpTable" class="display" style="width:100%">
+      <thead>
+        <tr>
+          <th>SNP</th>
+          <th>Beta_Exposure</th>
+          <th>P_Exposure</th>
+          <th>Beta_Outcome</th>
+          <th>P_Outcome</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>rs101</td><td>0.21</td><td>1e-5</td><td>0.12</td><td>0.003</td></tr>
+        <tr><td>rs102</td><td>-0.15</td><td>0.001</td><td>-0.08</td><td>0.02</td></tr>
+        <tr><td>rs103</td><td>0.05</td><td>0.12</td><td>0.03</td><td>0.07</td></tr>
+        <tr><td>rs104</td><td>0.3</td><td>3e-8</td><td>0.18</td><td>0.0001</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>📈 MR Scatter Plot</h2>
+    <div id="scatter" style="height:400px;"></div>
+  </div>
+
+  <div class="section">
+    <h2>🌲 Forest Plot of SNP Effects</h2>
+    <div id="forest" style="height:400px;"></div>
+  </div>
+
+  <div class="section">
+    <h2>📋 Method Summary</h2>
+    <table id="methodTable" class="display" style="width:100%">
+      <thead>
+        <tr>
+          <th>Method</th>
+          <th>Estimate</th>
+          <th>P-value</th>
+          <th>CI Lower</th>
+          <th>CI Upper</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>IVW</td><td>0.15</td><td>0.002</td><td>0.05</td><td>0.25</td></tr>
+        <tr><td>MR-Egger</td><td>0.12</td><td>0.03</td><td>0.01</td><td>0.23</td></tr>
+        <tr><td>Weighted Median</td><td>0.14</td><td>0.01</td><td>0.04</td><td>0.24</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footer">
+    📘 MR-CoPe Pipeline &mdash; Open-source | Version 1.0 | Contact: mrcope@openepi.org
+  </div>
+
+  <script>
+    // Date
+    document.getElementById("today").textContent = new Date().toLocaleDateString();
+
+    // DataTables
+    $(document).ready(function () {
+      $('#snpTable').DataTable();
+      $('#methodTable').DataTable();
+    });
+
+    // Scatter Plot
+    Plotly.newPlot('scatter', [{
+      x: [0.21, -0.15, 0.05, 0.3],
+      y: [0.12, -0.08, 0.03, 0.18],
+      mode: 'markers+text',
+      text: ['rs101', 'rs102', 'rs103', 'rs104'],
+      type: 'scatter',
+      marker: { size: 10, color: '#1f77b4' }
+    }], {
+      title: 'SNP Effects on Exposure vs Outcome',
+      xaxis: { title: 'Beta (Exposure)' },
+      yaxis: { title: 'Beta (Outcome)' }
+    });
+
+    // Forest Plot
+    Plotly.newPlot('forest', [{
+      x: [0.21, -0.15, 0.05, 0.3],
+      y: ['rs101', 'rs102', 'rs103', 'rs104'],
+      error_x: { type: 'data', array: [0.05, 0.04, 0.03, 0.05], visible: true },
+      type: 'bar',
+      orientation: 'h',
+      marker: { color: '#2ca02c' }
+    }], {
+      title: 'SNP Effect Sizes with CI (Exposure)',
+      xaxis: { title: 'Beta Estimate' },
+      yaxis: { autorange: 'reversed' }
+    });
+  </script>
+</body>
+</html>
