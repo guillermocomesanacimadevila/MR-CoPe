@@ -3,7 +3,7 @@ FROM rocker/r-ver:4.2.3
 ENV DEBIAN_FRONTEND=noninteractive
 
 # -----------------------------
-# System dependencies
+# Install system dependencies
 # -----------------------------
 RUN apt-get update && apt-get install -y \
     python3.10 python3-pip python-is-python3 \
@@ -14,33 +14,33 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean
 
 # -----------------------------
-# Python dependencies
+# Install Python packages
 # -----------------------------
 RUN pip install --upgrade pip && pip install \
     pandas numpy matplotlib seaborn scipy
 
 # -----------------------------
-# Create and set permissions for R library path
+# Set R library path and permissions
 # -----------------------------
-ENV R_LIBS_USER=/usr/local/lib/R/site-library
-RUN mkdir -p ${R_LIBS_USER} && chmod -R 777 ${R_LIBS_USER}
+ENV R_LIBS_SITE=/usr/local/lib/R/site-library
+RUN mkdir -p ${R_LIBS_SITE} && chmod -R 777 ${R_LIBS_SITE}
 
 # -----------------------------
-# Install core R packages
+# Install R CRAN packages
 # -----------------------------
 RUN Rscript -e "install.packages(c( \
   'devtools', 'optparse', 'tidyverse', 'qqman', 'ggrepel', 'data.table', \
   'patchwork', 'RColorBrewer', 'MASS', 'Matrix', 'gridExtra', 'lattice', \
   'stringr', 'purrr', 'plyr', 'tidyr' \
-), repos = 'https://cloud.r-project.org', lib=Sys.getenv('R_LIBS_USER'))"
+), repos = 'https://cloud.r-project.org')"
 
 # -----------------------------
-# Install remotes and TwoSampleMR
+# Install TwoSampleMR from GitHub
 # -----------------------------
-RUN Rscript -e "install.packages('remotes', repos='https://cloud.r-project.org', lib=Sys.getenv('R_LIBS_USER'))" && \
-    Rscript -e "remotes::install_github('MRCIEU/TwoSampleMR', upgrade = 'never', lib=Sys.getenv('R_LIBS_USER'))"
+RUN Rscript -e "install.packages('remotes', repos='https://cloud.r-project.org')" && \
+    Rscript -e "remotes::install_github('MRCIEU/TwoSampleMR', upgrade = 'never')"
 
 # -----------------------------
-# Set default working directory
+# Set working directory
 # -----------------------------
 WORKDIR /app
