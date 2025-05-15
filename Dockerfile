@@ -1,11 +1,9 @@
 FROM rocker/r-ver:4.2.3
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV R_LIBS_USER=/usr/local/lib/R/site-library
-ENV PATH="${PATH}:/usr/local/bin"
 
 # -----------------------------
-# 🧰 System Dependencies
+# System dependencies
 # -----------------------------
 RUN apt-get update && apt-get install -y \
     python3.10 python3-pip python-is-python3 \
@@ -13,22 +11,22 @@ RUN apt-get update && apt-get install -y \
     cmake git wget curl libgit2-dev \
     libharfbuzz-dev libfribidi-dev libfreetype6-dev libpng-dev \
     libtiff5-dev libjpeg-dev \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    && apt-get clean
 
 # -----------------------------
-# 🐍 Python Dependencies
+# Python dependencies
 # -----------------------------
 RUN pip install --upgrade pip && pip install \
     pandas numpy matplotlib seaborn scipy
 
 # -----------------------------
-# 📁 Ensure Writable R Lib Directory
+# Create and set permissions for R library path
 # -----------------------------
-RUN mkdir -p /usr/local/lib/R/site-library && \
-    chmod -R 777 /usr/local/lib/R/site-library
+ENV R_LIBS_USER=/usr/local/lib/R/site-library
+RUN mkdir -p ${R_LIBS_USER} && chmod -R 777 ${R_LIBS_USER}
 
 # -----------------------------
-# 📦 R Dependencies (CRAN)
+# Install core R packages
 # -----------------------------
 RUN Rscript -e "install.packages(c( \
   'devtools', 'optparse', 'tidyverse', 'qqman', 'ggrepel', 'data.table', \
@@ -37,12 +35,12 @@ RUN Rscript -e "install.packages(c( \
 ), repos = 'https://cloud.r-project.org', lib=Sys.getenv('R_LIBS_USER'))"
 
 # -----------------------------
-# 🔗 GitHub Dependencies (TwoSampleMR)
+# Install remotes and TwoSampleMR
 # -----------------------------
 RUN Rscript -e "install.packages('remotes', repos='https://cloud.r-project.org', lib=Sys.getenv('R_LIBS_USER'))" && \
     Rscript -e "remotes::install_github('MRCIEU/TwoSampleMR', upgrade = 'never', lib=Sys.getenv('R_LIBS_USER'))"
 
 # -----------------------------
-# 📂 Working Directory
+# Set default working directory
 # -----------------------------
 WORKDIR /app
