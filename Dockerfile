@@ -5,8 +5,9 @@
 
 FROM rocker/r-ver:4.2.3
 
-# Prevent interactive prompts during build
+# Prevent interactive prompts
 ENV DEBIAN_FRONTEND=noninteractive
+ENV R_LIBS_USER=/usr/local/lib/R/site-library
 
 # -----------------------------
 # Install system dependencies
@@ -20,9 +21,9 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean
 
 # -----------------------------
-# Make R library path writable
+# Ensure R library path is writable
 # -----------------------------
-RUN mkdir -p /usr/local/lib/R/site-library && chmod -R 777 /usr/local/lib/R/site-library
+RUN mkdir -p ${R_LIBS_USER} && chmod -R 777 ${R_LIBS_USER}
 
 # -----------------------------
 # Install Python dependencies
@@ -34,16 +35,17 @@ RUN pip install --upgrade pip && pip install \
 # Install R CRAN packages
 # -----------------------------
 RUN Rscript -e "install.packages(c( \
-  'devtools', 'optparse', 'tidyverse', 'qqman', 'ggrepel', 'data.table', \
-  'patchwork', 'RColorBrewer', 'MASS', 'Matrix', 'gridExtra', 'lattice', \
-  'stringr', 'purrr', 'plyr', 'tidyr' \
+    'devtools', 'optparse', 'tidyverse', 'qqman', 'ggrepel', 'data.table', \
+    'patchwork', 'RColorBrewer', 'MASS', 'Matrix', 'gridExtra', 'lattice', \
+    'stringr', 'purrr', 'plyr', 'tidyr' \
 ), repos='https://cloud.r-project.org')"
 
 # -----------------------------
-# ✅ Officially recommended way to install TwoSampleMR
+# Install TwoSampleMR + ieugwasr (required for ld_clump)
 # -----------------------------
-RUN Rscript -e "install.packages('TwoSampleMR', repos=c('https://mrcieu.r-universe.dev', 'https://cloud.r-project.org'))" && \
-    Rscript -e "stopifnot('TwoSampleMR' %in% rownames(installed.packages()))"
+RUN Rscript -e "install.packages(c('TwoSampleMR', 'ieugwasr'), \
+  repos=c('https://mrcieu.r-universe.dev', 'https://cloud.r-project.org'))" && \
+  Rscript -e "stopifnot(all(c('TwoSampleMR', 'ieugwasr') %in% rownames(installed.packages())))"
 
 # -----------------------------
 # Set default working directory
