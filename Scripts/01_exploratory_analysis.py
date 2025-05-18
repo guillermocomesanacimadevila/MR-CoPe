@@ -122,6 +122,12 @@ def manhattan_plot(df, output_path, title):
         return
 
     df = df.dropna(subset=["CHR", "BP", "PVALUE"])
+    df = df[df["PVALUE"] > 0]  # ← filter out zero or invalid p-values
+
+    if df.empty:
+        print(f"❌ Skipping Manhattan plot — no valid data points in {title}.")
+        return
+
     df["-log10(PVALUE)"] = -np.log10(df["PVALUE"])
     df["CHR"] = df["CHR"].astype(str)
 
@@ -150,24 +156,16 @@ def manhattan_plot(df, output_path, title):
     ax.axhline(y=-np.log10(genomewide_sig), color='red', linestyle='--', linewidth=1)
     ax.axhline(y=-np.log10(suggestive_sig), color='orange', linestyle='--', linewidth=1)
 
-    ax.text(df["ind"].max() * 0.99, -np.log10(genomewide_sig) + 0.2,
-            "Genome-wide sig (5e-8)", ha='right', fontsize=7, color='red')
-    ax.text(df["ind"].max() * 0.99, -np.log10(suggestive_sig) + 0.2,
-            "Suggestive (1e-5)", ha='right', fontsize=7, color='orange')
-
-    # Axes formatting
-    ax.set_xticks(x_labels_pos)
-    ax.set_xticklabels(x_labels, fontsize=6)
-    ax.set_xlim([0, len(df)])
-
     ymax = df["-log10(PVALUE)"].max()
     ax.set_ylim([0, ymax + 0.1 * ymax])
 
+    ax.set_xticks(x_labels_pos)
+    ax.set_xticklabels(x_labels, fontsize=6)
+    ax.set_xlim([0, len(df)])
     ax.set_xlabel("Chromosome", fontsize=10)
     ax.set_ylabel("-log10(p)", fontsize=10)
     ax.set_title(title, fontsize=12, weight='bold', pad=15)
 
-    # Aesthetic cleanup
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.tick_params(axis='y', labelsize=7)
