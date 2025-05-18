@@ -21,6 +21,7 @@
 suppressPackageStartupMessages({
   library(TwoSampleMR)
   library(dplyr)
+  library(ieugwasr) 
   library(readr)
 })
 
