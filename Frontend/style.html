@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>🧬 MR-CoPe Results Report</title>
+  <title>MR-CoPe | Mendelian Randomisation Report</title>
 
-  <!-- Aesthetic Google Font -->
+  <!-- Google Font -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700&display=swap" rel="stylesheet"/>
 
   <!-- DataTables CSS -->
@@ -21,123 +21,163 @@
   <style>
     body {
       font-family: 'Inter', sans-serif;
-      margin: 2rem auto;
-      max-width: 960px;
-      background: #f9f9fb;
-      color: #333;
-      padding: 1rem;
-      line-height: 1.6;
+      background: #f0f2f5;
+      color: #2c3e50;
+      margin: 0;
+      padding: 2rem;
     }
 
-    h1, h2, h3 {
-      color: #1f2d3d;
+    h1, h2 {
+      font-weight: 700;
+      margin-bottom: 1rem;
+    }
+
+    h2 {
+      border-bottom: 2px solid #e0e0e0;
+      padding-bottom: 0.4rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
     }
 
     .section {
-      margin-bottom: 3rem;
-      padding: 1.5rem;
-      background: white;
-      border-radius: 10px;
-      box-shadow: 0 0 12px rgba(0,0,0,0.05);
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 14px;
+      padding: 2rem;
+      margin-bottom: 2.5rem;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
+      backdrop-filter: blur(6px);
     }
 
-    .dataTables_wrapper {
-      margin-top: 1rem;
+    table.dataTable {
+      font-size: 0.95rem;
+      border-collapse: collapse;
+      width: 100%;
     }
 
     .footer {
-      margin-top: 4rem;
-      font-size: 0.9rem;
+      text-align: center;
+      font-size: 0.85rem;
       color: #888;
+      margin-top: 4rem;
+    }
+
+    .report-header {
+      margin-bottom: 3rem;
+    }
+
+    #scatter, #forest {
+      margin-top: 1rem;
+    }
+
+    @media print {
+      body {
+        background: white;
+        color: black;
+      }
+      .section {
+        box-shadow: none;
+      }
     }
   </style>
 </head>
 
 <body>
+  <div class="container">
 
-  <h1>🧬 MR-CoPe Report</h1>
-  <p><strong>Date:</strong> <span id="today"></span></p>
+    <div class="report-header">
+      <h1>🧬 MR-CoPe Results Report</h1>
+      <p><strong>Date:</strong> <span id="today"></span></p>
+    </div>
 
-  <div class="section">
-    <h2>📊 SNP Summary Table</h2>
-    <table id="snpTable" class="display" style="width:100%">
-      <thead>
-        <tr>
-          <th>SNP</th>
-          <th>Beta_Exposure</th>
-          <th>P_Exposure</th>
-          <th>Beta_Outcome</th>
-          <th>P_Outcome</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr><td>rs101</td><td>0.21</td><td>1e-5</td><td>0.12</td><td>0.003</td></tr>
-        <tr><td>rs102</td><td>-0.15</td><td>0.001</td><td>-0.08</td><td>0.02</td></tr>
-        <tr><td>rs103</td><td>0.05</td><td>0.12</td><td>0.03</td><td>0.07</td></tr>
-        <tr><td>rs104</td><td>0.3</td><td>3e-8</td><td>0.18</td><td>0.0001</td></tr>
-      </tbody>
-    </table>
-  </div>
+    <div class="section">
+      <h2>📊 SNP Summary Table</h2>
+      <table id="snpTable" class="display" style="width:100%">
+        <thead>
+          <tr>
+            <th>SNP</th>
+            <th>Beta_Exposure</th>
+            <th>P_Exposure</th>
+            <th>Beta_Outcome</th>
+            <th>P_Outcome</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>rs101</td><td>0.21</td><td>1e-5</td><td>0.12</td><td>0.003</td></tr>
+          <tr><td>rs102</td><td>-0.15</td><td>0.001</td><td>-0.08</td><td>0.02</td></tr>
+          <tr><td>rs103</td><td>0.05</td><td>0.12</td><td>0.03</td><td>0.07</td></tr>
+          <tr><td>rs104</td><td>0.3</td><td>3e-8</td><td>0.18</td><td>0.0001</td></tr>
+        </tbody>
+      </table>
+    </div>
 
-  <div class="section">
-    <h2>📈 MR Scatter Plot</h2>
-    <div id="scatter" style="height:400px;"></div>
-  </div>
+    <div class="section">
+      <h2>📈 MR Scatter Plot</h2>
+      <div id="scatter" style="height:450px;"></div>
+    </div>
 
-  <div class="section">
-    <h2>🌲 Forest Plot of SNP Effects</h2>
-    <div id="forest" style="height:400px;"></div>
-  </div>
+    <div class="section">
+      <h2>🌲 Forest Plot of SNP Effects</h2>
+      <div id="forest" style="height:450px;"></div>
+    </div>
 
-  <div class="section">
-    <h2>📋 Method Summary</h2>
-    <table id="methodTable" class="display" style="width:100%">
-      <thead>
-        <tr>
-          <th>Method</th>
-          <th>Estimate</th>
-          <th>P-value</th>
-          <th>CI Lower</th>
-          <th>CI Upper</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr><td>IVW</td><td>0.15</td><td>0.002</td><td>0.05</td><td>0.25</td></tr>
-        <tr><td>MR-Egger</td><td>0.12</td><td>0.03</td><td>0.01</td><td>0.23</td></tr>
-        <tr><td>Weighted Median</td><td>0.14</td><td>0.01</td><td>0.04</td><td>0.24</td></tr>
-      </tbody>
-    </table>
-  </div>
+    <div class="section">
+      <h2>📋 Method Summary</h2>
+      <table id="methodTable" class="display" style="width:100%">
+        <thead>
+          <tr>
+            <th>Method</th>
+            <th>Estimate</th>
+            <th>P-value</th>
+            <th>CI Lower</th>
+            <th>CI Upper</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>IVW</td><td>0.15</td><td>0.002</td><td>0.05</td><td>0.25</td></tr>
+          <tr><td>MR-Egger</td><td>0.12</td><td>0.03</td><td>0.01</td><td>0.23</td></tr>
+          <tr><td>Weighted Median</td><td>0.14</td><td>0.01</td><td>0.04</td><td>0.24</td></tr>
+        </tbody>
+      </table>
+    </div>
 
-  <div class="footer">
-    📘 MR-CoPe Pipeline &mdash; Open-source | Version 1.0 | Contact: mrcope@openepi.org
+    <div class="footer">
+      MR-CoPe Pipeline · Open Source · v1.0<br/>
+      Contact: <a href="mailto:mrcope@openepi.org">mrcope@openepi.org</a>
+    </div>
+
   </div>
 
   <script>
-    // Date
+    // Set current date
     document.getElementById("today").textContent = new Date().toLocaleDateString();
 
-    // DataTables
+    // Initialize DataTables
     $(document).ready(function () {
-      $('#snpTable').DataTable();
-      $('#methodTable').DataTable();
+      $('#snpTable').DataTable({ responsive: true });
+      $('#methodTable').DataTable({ responsive: true });
     });
 
-    // Scatter Plot
+    // Plotly MR Scatter Plot
     Plotly.newPlot('scatter', [{
       x: [0.21, -0.15, 0.05, 0.3],
       y: [0.12, -0.08, 0.03, 0.18],
       mode: 'markers+text',
       text: ['rs101', 'rs102', 'rs103', 'rs104'],
+      textposition: 'top center',
       type: 'scatter',
       marker: { size: 10, color: '#1f77b4' }
     }], {
       title: 'SNP Effects on Exposure vs Outcome',
       xaxis: { title: 'Beta (Exposure)' },
-      yaxis: { title: 'Beta (Outcome)' }
+      yaxis: { title: 'Beta (Outcome)' },
+      margin: { t: 50 }
     });
 
-    // Forest Plot
+    // Plotly Forest Plot
     Plotly.newPlot('forest', [{
       x: [0.21, -0.15, 0.05, 0.3],
       y: ['rs101', 'rs102', 'rs103', 'rs104'],
@@ -146,9 +186,10 @@
       orientation: 'h',
       marker: { color: '#2ca02c' }
     }], {
-      title: 'SNP Effect Sizes with CI (Exposure)',
+      title: 'SNP Effect Sizes with Confidence Intervals',
       xaxis: { title: 'Beta Estimate' },
-      yaxis: { autorange: 'reversed' }
+      yaxis: { autorange: 'reversed' },
+      margin: { t: 50 }
     });
   </script>
 </body>
