@@ -15,13 +15,13 @@
 # Notes:
 # - Requires 'SNP' and 'PVALUE_exp' columns in the input file
 # - Uses 10,000 kb window, r2 = 0.001 threshold
-# - Requires internet access unless reference LD data are cached
+# - Will exit gracefully if no SNPs survive LD pruning
 # ===================================================================
 
 suppressPackageStartupMessages({
   library(TwoSampleMR)
   library(dplyr)
-  library(ieugwasr) 
+  library(ieugwasr)
   library(readr)
 })
 
@@ -96,6 +96,13 @@ clumped <- tryCatch({
 })
 
 # ------------------ Filter and Save Results ------------------ #
+
+if (nrow(clumped) == 0) {
+  cat("⚠️ No SNPs passed LD clumping.\n")
+  cat("💾 Writing empty output file so pipeline can gracefully skip MR.\n")
+  file.create(output_file)
+  quit(status = 0)
+}
 
 gwas_pruned <- gwas %>% filter(SNP %in% clumped$rsid)
 
