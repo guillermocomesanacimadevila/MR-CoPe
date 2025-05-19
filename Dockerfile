@@ -1,6 +1,5 @@
 # ===========================================
 # MR-CoPe: Dockerfile for Mendelian Randomisation Pipeline
-# Base image: R 4.2.3 with Linux tools
 # ===========================================
 
 FROM rocker/r-ver:4.2.3
@@ -18,6 +17,7 @@ RUN apt-get update && apt-get install -y \
     libcurl4-openssl-dev libssl-dev libxml2-dev libgit2-dev \
     libharfbuzz-dev libfribidi-dev libfreetype6-dev \
     libpng-dev libtiff5-dev libjpeg-dev \
+    libglpk-dev libzmq3-dev libfontconfig1-dev \
     && apt-get clean
 
 # -----------------------------
@@ -32,22 +32,28 @@ RUN pip install --upgrade pip && pip install \
     pandas numpy matplotlib seaborn scipy
 
 # -----------------------------
-# Install R CRAN packages
+# Install base R packages from CRAN
 # -----------------------------
 RUN Rscript -e "install.packages(c( \
-    'devtools', 'optparse', 'tidyverse', 'qqman', 'ggrepel', 'data.table', \
+    'devtools', 'optparse', 'qqman', 'ggrepel', 'data.table', \
     'patchwork', 'RColorBrewer', 'MASS', 'Matrix', 'gridExtra', 'lattice', \
-    'stringr', 'purrr', 'plyr', 'tidyr' \
+    'stringr', 'purrr', 'plyr', 'tidyr', 'remotes' \
 ), repos='https://cloud.r-project.org')"
 
 # -----------------------------
-# Install TwoSampleMR + ieugwasr (required for ld_clump)
+# Install tidyverse with verification
 # -----------------------------
-RUN Rscript -e "install.packages(c('TwoSampleMR', 'ieugwasr'), \
-  repos=c('https://mrcieu.r-universe.dev', 'https://cloud.r-project.org'))" && \
-  Rscript -e "stopifnot(all(c('TwoSampleMR', 'ieugwasr') %in% rownames(installed.packages())))"
+RUN Rscript -e "install.packages('tidyverse', repos='https://cloud.r-project.org')" && \
+    Rscript -e "stopifnot('tidyverse' %in% rownames(installed.packages()))"
 
 # -----------------------------
-# Set default working directory
+# Install TwoSampleMR + ieugwasr from r-universe with verification
+# -----------------------------
+RUN Rscript -e "install.packages(c('TwoSampleMR', 'ieugwasr'), \
+    repos=c('https://mrcieu.r-universe.dev', 'https://cloud.r-project.org'))" && \
+    Rscript -e "stopifnot(all(c('TwoSampleMR', 'ieugwasr') %in% rownames(installed.packages())))"
+
+# -----------------------------
+# Set working directory
 # -----------------------------
 WORKDIR /app
