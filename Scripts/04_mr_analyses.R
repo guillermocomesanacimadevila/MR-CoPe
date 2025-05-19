@@ -84,14 +84,26 @@ if (!"eaf.outcome" %in% names(filtered_snps)) {
   }
 }
 
-# ---- Rename Common Columns ----
+# ---- Rename Common Allele Columns ----
 rename_cols <- c(
   A1_exp = "effect_allele",
   A2_exp = "other_allele",
   A1_out = "effect_allele.outcome",
   A2_out = "other_allele.outcome"
 )
-filtered_snps <- filtered_snps %>% rename(any_of(rename_cols))
+
+existing_rename <- intersect(names(rename_cols), names(filtered_snps))
+filtered_snps <- filtered_snps %>%
+  rename(any_of(rename_cols[existing_rename]))
+
+# ---- Check Column Availability ----
+required_cols <- c("SNP", "BETA_exp", "SE_exp", "PVALUE_exp", "effect_allele", "other_allele",
+                   "BETA_out", "SE_out", "PVALUE_out", "effect_allele.outcome", "other_allele.outcome")
+
+missing_cols <- setdiff(required_cols, names(filtered_snps))
+if (length(missing_cols) > 0) {
+  stop(paste("❌ Missing required columns in harmonised file:", paste(missing_cols, collapse = ", ")))
+}
 
 # ---- Exposure Dataset ----
 exposure_dat <- filtered_snps %>%
