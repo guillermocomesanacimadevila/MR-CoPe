@@ -4,10 +4,9 @@
 # MR-CoPe | Mendelian Randomisation Analysis using TwoSampleMR
 # ================================================================
 # Author: Guillermo Comesaña & Christian Pepler
-# Date: 2025
 #
 # Usage:
-#   Rscript 04_mr_analysis.R <input_ld_pruned_snps.csv>
+#   Rscript 04_mr_analyses.R <input_ld_pruned_snps.csv>
 #
 # Description:
 #   Performs MR analyses (IVW, Egger, Weighted Median) on LD-pruned,
@@ -47,7 +46,7 @@ suppressPackageStartupMessages({
 args <- commandArgs(trailingOnly = TRUE)
 
 if (length(args) != 1) {
-  stop("Usage: Rscript 04_mr_analysis.R <input_ld_pruned_snps.csv>")
+  stop("Usage: Rscript 04_mr_analyses.R <input_ld_pruned_snps.csv>")
 }
 
 input_file <- args[1]
@@ -56,38 +55,30 @@ cat("\n==============================================================\n")
 cat("MR-CoPe | Mendelian Randomisation Analysis\n")
 cat("==============================================================\n\n")
 
+if (!file.exists(input_file) || file.info(input_file)$size == 0) {
+  cat("❌ ERROR: Input file is missing or empty — no SNPs passed LD pruning.\n")
+  cat("🛑 Skipping MR analysis step.\n")
+
+  empty_df <- data.frame()
+  write.csv(empty_df, "MR_Formatted_Results.csv", row.names = FALSE)
+  write.csv(empty_df, "MR_IVW_OR_Per_SNP.csv", row.names = FALSE)
+  write.csv(empty_df, "exposure_dat.csv", row.names = FALSE)
+  write.csv(empty_df, "outcome_dat.csv", row.names = FALSE)
+  write.csv(empty_df, "harmonised_data.csv", row.names = FALSE)
+
+  quit(status = 0)
+}
+
 cat("📥 Loading input file:", input_file, "\n")
 filtered_snps <- read.csv(input_file)
 cat("📊 SNPs in analysis:", nrow(filtered_snps), "\n\n")
 
-# ---- Clean Column Names ----
 colnames(filtered_snps) <- gsub("\\s+", "", colnames(filtered_snps))
 
-# ---- Print available columns ----
 cat("🧾 Columns available in merged dataset:\n")
 print(colnames(filtered_snps))
 
-# ---- Rename Common Allele Columns (robustly) ----
-# Convert to lowercase to match regardless of original case
-colnames_lower <- tolower(colnames(filtered_snps))
-rename_map <- list(
-  a1_exp = "effect_allele",
-  a2_exp = "other_allele",
-  a1_out = "effect_allele.outcome",
-  a2_out = "other_allele.outcome"
-)
-
-for (i in seq_along(rename_map)) {
-  from_lower <- names(rename_map)[i]
-  to <- rename_map[[i]]
-  idx <- which(colnames_lower == from_lower)
-  if (length(idx) == 1) {
-    colnames(filtered_snps)[idx] <- to
-    cat(paste("🔄 Renamed:", from_lower, "→", to, "\n"))
-  }
-}
-
-# ---- Fallback Renaming for EAF Columns (if missing) ----
+# ---- Fallback Renaming for EAF ----
 if (!"eaf" %in% names(filtered_snps)) {
   eaf_candidates <- c("EAF_exp", "effect_allele_freq", "eaf_exposure")
   existing <- intersect(eaf_candidates, names(filtered_snps))
@@ -108,16 +99,19 @@ if (!"eaf.outcome" %in% names(filtered_snps)) {
   }
 }
 
-# ---- Final Check for Required Columns ----
-required_cols <- c("SNP", "BETA_exp", "SE_exp", "PVALUE_exp",
-                   "effect_allele", "other_allele",
-                   "BETA_out", "SE_out", "PVALUE_out",
-                   "effect_allele.outcome", "other_allele.outcome")
+# ---- Rename for harmonisation ----
+rename_cols <- c(
+  A1_exp = "effect_allele",
+  A2_exp = "other_allele",
+  A1_out = "effect_allele.outcome",
+  A2_out = "other_allele.outcome"
+)
+filtered_snps <- filtered_snps %>% rename(any_of(rename_cols))
 
-missing_cols <- setdiff(required_cols, names(filtered_snps))
-if (length(missing_cols) > 0) {
-  stop(paste("❌ Missing required columns in harmonised file:", paste(missing_cols, collapse = ", ")))
-}
+cat("🔄 Renamed: a1_exp → effect_allele \n")
+cat("🔄 Renamed: a2_exp → other_allele \n")
+cat("🔄 Renamed: a1_out → effect_allele.outcome \n")
+cat("🔄 Renamed: a2_out → other_allele.outcome \n\n")
 
 # ---- Exposure Dataset ----
 exposure_dat <- filtered_snps %>%
@@ -130,31 +124,39 @@ write.csv(exposure_dat, "exposure_dat.csv", row.names = FALSE)
 # ---- Outcome Dataset ----
 outcome_dat <- filtered_snps %>%
   select(SNP, beta = BETA_out, se = SE_out, pval = PVALUE_out,
-         eaf = eaf.outcome, effect_allele = effect_allele.outcome, other_allele = other_allele.outcome) %>%
+         eaf = eaf.outcome, effect_allele = effect_allele.outcome,
+         other_allele = other_allele.outcome) %>%
   drop_na()
 
 write.csv(outcome_dat, "outcome_dat.csv", row.names = FALSE)
 
-# ---- Format Data ----
+# ---- Format & Harmonise ----
 exposure_dat <- format_data(exposure_dat, type = "exposure")
 outcome_dat <- format_data(outcome_dat, type = "outcome")
 
-# ---- Harmonisation ----
 harmonised_data <- harmonise_data(exposure_dat, outcome_dat, action = 2)
 write.csv(harmonised_data, "harmonised_data.csv", row.names = FALSE)
 
 cat("📊 SNPs after harmonisation:", nrow(harmonised_data), "\n\n")
 
-# ---- MR Analyses ----
+if (nrow(harmonised_data) == 0) {
+  cat("❌ No data available for MR analysis after filtering. Check SNP overlap and F-stat filtering.\n")
+  empty_df <- data.frame()
+  write.csv(empty_df, "MR_Formatted_Results.csv", row.names = FALSE)
+  write.csv(empty_df, "MR_IVW_OR_Per_SNP.csv", row.names = FALSE)
+  quit(status = 0)
+}
+
+# ---- MR Analysis ----
 cat("⚙️ Running MR methods...\n")
 methods <- c("mr_ivw", "mr_egger_regression", "mr_weighted_median")
 results_df <- mr(harmonised_data, method_list = methods)
 
-# ---- Sensitivity Analyses ----
+# ---- Sensitivity ----
 heterogeneity <- mr_heterogeneity(harmonised_data)
 pleiotropy <- mr_pleiotropy_test(harmonised_data)
 
-# ---- IVW OR per SNP ----
+# ---- Per-SNP OR ----
 IVW_SNP_results <- data.frame(
   SNP = harmonised_data$SNP,
   IVW_OR = exp(harmonised_data$beta.exposure / harmonised_data$se.exposure),
@@ -163,7 +165,7 @@ IVW_SNP_results <- data.frame(
 )
 write.csv(IVW_SNP_results, "MR_IVW_OR_Per_SNP.csv", row.names = FALSE)
 
-# ---- Summary Table ----
+# ---- Summary ----
 results <- tibble(
   N_SNPs = nrow(harmonised_data),
 
