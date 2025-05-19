@@ -161,7 +161,7 @@ def main():
     genome_wide = exposure[exposure["PVALUE"] < 5e-8]
     if genome_wide.shape[0] < 10:
         print(f"⚠️ Only {genome_wide.shape[0]} SNPs with p < 5e-8 — relaxing threshold to p < 5e-5")
-        exposure = exposure[exposure["PVALUE"] < 5e-5]
+        exposure = exposure[exposure["PVALUE"] < 5e-4]
     else:
         exposure = genome_wide
 
