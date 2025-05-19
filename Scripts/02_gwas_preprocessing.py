@@ -105,20 +105,36 @@ def load_gwas(path, label):
     df.columns = df.columns.str.strip()
     print(f"✅ Loaded {label} GWAS | Shape: {df.shape}\n")
 
-    mapping = auto_map_columns(df, label)
-
-    if not all(k in mapping for k in ["SNP", "CHR", "BP", "PVALUE"]):
-        if {"riskAllele", "locations", "pValue"}.issubset(df.columns):
-            df = parse_custom_gwas(df, label)
-        else:
-            print(f"❌ ERROR: Missing critical columns in {label} GWAS and no fallback possible.")
-            sys.exit(1)
+    # Handle ENSEMBL-style format
+    if {"rsids", "beta", "pval", "alt", "ref"}.issubset(df.columns):
+        print("🔄 Detected ENSEMBL-style GWAS — remapping columns...")
+        df = df.rename(columns={
+            "rsids": "SNP",
+            "beta": "BETA",
+            "pval": "PVALUE",
+            "alt": "A1",
+            "ref": "A2",
+            "maf": "EAF"
+        })
+        df = df[["SNP", "BETA", "PVALUE", "A1", "A2", "EAF"] if "EAF" in df.columns else ["SNP", "BETA", "PVALUE", "A1", "A2"]]
     else:
-        for std_col, original_col in mapping.items():
-            if std_col != original_col and original_col in df.columns:
-                df.rename(columns={original_col: std_col}, inplace=True)
+        mapping = auto_map_columns(df, label)
+        if not all(k in mapping for k in ["SNP", "CHR", "BP", "PVALUE"]):
+            if {"riskAllele", "locations", "pValue"}.issubset(df.columns):
+                df = parse_custom_gwas(df, label)
+            else:
+                print(f"❌ ERROR: Missing critical columns in {label} GWAS and no fallback possible.")
+                sys.exit(1)
+        else:
+            for std_col, original_col in mapping.items():
+                if std_col != original_col and original_col in df.columns:
+                    df.rename(columns={original_col: std_col}, inplace=True)
 
+    df["BETA"] = pd.to_numeric(df["BETA"], errors='coerce')
+    df["PVALUE"] = pd.to_numeric(df["PVALUE"], errors='coerce')
     df = infer_se_if_missing(df)
+    df.dropna(subset=["SNP", "BETA", "SE", "PVALUE"], inplace=True)
+
     return df
 
 def calculate_f_statistics(df):
