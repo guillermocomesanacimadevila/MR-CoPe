@@ -63,6 +63,30 @@ cat("📊 SNPs in analysis:", nrow(filtered_snps), "\n\n")
 # ---- Clean Column Names ----
 colnames(filtered_snps) <- gsub("\\s+", "", colnames(filtered_snps))
 
+# ---- Print available columns ----
+cat("🧾 Columns available in merged dataset:\n")
+print(colnames(filtered_snps))
+
+# ---- Rename Common Allele Columns (robustly) ----
+# Convert to lowercase to match regardless of original case
+colnames_lower <- tolower(colnames(filtered_snps))
+rename_map <- list(
+  a1_exp = "effect_allele",
+  a2_exp = "other_allele",
+  a1_out = "effect_allele.outcome",
+  a2_out = "other_allele.outcome"
+)
+
+for (i in seq_along(rename_map)) {
+  from_lower <- names(rename_map)[i]
+  to <- rename_map[[i]]
+  idx <- which(colnames_lower == from_lower)
+  if (length(idx) == 1) {
+    colnames(filtered_snps)[idx] <- to
+    cat(paste("🔄 Renamed:", from_lower, "→", to, "\n"))
+  }
+}
+
 # ---- Fallback Renaming for EAF Columns (if missing) ----
 if (!"eaf" %in% names(filtered_snps)) {
   eaf_candidates <- c("EAF_exp", "effect_allele_freq", "eaf_exposure")
@@ -84,21 +108,11 @@ if (!"eaf.outcome" %in% names(filtered_snps)) {
   }
 }
 
-# ---- Rename Common Allele Columns ----
-rename_cols <- c(
-  A1_exp = "effect_allele",
-  A2_exp = "other_allele",
-  A1_out = "effect_allele.outcome",
-  A2_out = "other_allele.outcome"
-)
-
-existing_rename <- intersect(names(rename_cols), names(filtered_snps))
-filtered_snps <- filtered_snps %>%
-  rename(any_of(rename_cols[existing_rename]))
-
-# ---- Check Column Availability ----
-required_cols <- c("SNP", "BETA_exp", "SE_exp", "PVALUE_exp", "effect_allele", "other_allele",
-                   "BETA_out", "SE_out", "PVALUE_out", "effect_allele.outcome", "other_allele.outcome")
+# ---- Final Check for Required Columns ----
+required_cols <- c("SNP", "BETA_exp", "SE_exp", "PVALUE_exp",
+                   "effect_allele", "other_allele",
+                   "BETA_out", "SE_out", "PVALUE_out",
+                   "effect_allele.outcome", "other_allele.outcome")
 
 missing_cols <- setdiff(required_cols, names(filtered_snps))
 if (length(missing_cols) > 0) {
