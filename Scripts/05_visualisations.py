@@ -6,7 +6,7 @@ Author: Guillermo Comesaña & Christian Pepler
 Date: 2025
 
 Usage:
-    python3 06_visualisation.py <MR_Formatted_Results.csv> <MR_IVW_OR_Per_SNP.csv> <output_dir>
+    python3 05_visualisations.py <MR_Formatted_Results.csv> <MR_IVW_OR_Per_SNP.csv> <output_dir>
 
 Description:
 - Generates method-level MR results plot (IVW, WM, Egger).
@@ -27,6 +27,18 @@ def validate_inputs(paths, labels):
             sys.exit(1)
 
 
+def safe_load_csv(path, label):
+    try:
+        df = pd.read_csv(path)
+        if df.empty:
+            print(f"⚠️ WARNING: {label} file is empty. Skipping visualisation.")
+            sys.exit(0)
+        return df
+    except Exception as e:
+        print(f"❌ ERROR loading {label}: {e}")
+        sys.exit(1)
+
+
 def main():
     if len(sys.argv) != 4:
         print(__doc__)
@@ -44,11 +56,15 @@ def main():
 
     # --- Load MR Summary Data --- #
     print("📥 Loading MR summary results...")
-    df = pd.read_csv(results_file)
+    df = safe_load_csv(results_file, "MR summary results")
     print(f"✅ Loaded: {df.shape}\n")
 
-    methods = ["IVW", "Weighted Median", "Egger"]
+    required_cols = ["IVW_OR", "WM_OR", "Egger_OR"]
+    if not all(col in df.columns for col in required_cols):
+        print(f"❌ ERROR: Required columns missing from MR summary results. Found columns: {df.columns.tolist()}")
+        sys.exit(1)
 
+    methods = ["IVW", "Weighted Median", "Egger"]
     ORs = [df["IVW_OR"].iloc[0], df["WM_OR"].iloc[0], df["Egger_OR"].iloc[0]]
     Lower = [df["IVW_CI_Lower"].iloc[0], df["WM_CI_Lower"].iloc[0], df["Egger_CI_Lower"].iloc[0]]
     Upper = [df["IVW_CI_Upper"].iloc[0], df["WM_CI_Upper"].iloc[0], df["Egger_CI_Upper"].iloc[0]]
@@ -75,7 +91,7 @@ def main():
 
     # --- Load SNP-level IVW Results --- #
     print("📥 Loading SNP-level IVW results...")
-    snp_df = pd.read_csv(snp_file)
+    snp_df = safe_load_csv(snp_file, "SNP-level results")
     print(f"✅ Loaded SNPs: {snp_df.shape[0]}\n")
 
     snp_df["Lower_CI"] = snp_df["IVW_Lower_95"]
