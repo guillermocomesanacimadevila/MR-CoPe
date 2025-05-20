@@ -2,7 +2,7 @@
 
 A reproducible and scalable pipeline for Mendelian Randomisation analysis using summary-level GWAS data.
 
-<img src="https://github.com/user-attachments/assets/e3b9cc97-bf7d-4357-9a6f-8ef48943928e" width="300" alt="Mendelian Randomisation Diagram" />
+<img src="https://github.com/user-attachments/assets/e3b9cc97-bf7d-4357-9a6f-8ef48943928e" width="600" alt="Mendelian Randomisation Diagram" />
 
 ---
 
