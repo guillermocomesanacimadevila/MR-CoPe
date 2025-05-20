@@ -8,7 +8,7 @@
 #
 # Description:
 #   This script launches the MR-CoPe pipeline using Docker and Nextflow.
-#   It supports both CSV/TSV and VCF (gzipped or not) input formats.
+#   It supports CSV/TSV or VCF (gzipped or not) input formats, with p-value logic.
 ###############################################################################
 
 set -e
@@ -25,19 +25,25 @@ FORMAT=$(echo "$FORMAT" | tr '[:upper:]' '[:lower:]')
 convert_vcf_to_csv() {
   local input_vcf="$1"
   local output_csv="$2"
+  local is_log10="$3"
 
   echo "🔄 Parsing VCF: $input_vcf → $output_csv"
 
   python3 - <<EOF
 import gzip
 import csv
+import sys
 
 vcf_path = "$input_vcf"
 csv_path = "$output_csv"
+is_log10 = ${is_log10,,} == "true"
 
 def parse_sample_field(field):
     es, se, lp, af, rsid = field.split(":")
-    pval = 10 ** (-float(lp)) if lp not in ("NA", ".", "") else None
+    try:
+        pval = 10 ** (-float(lp)) if is_log10 else float(lp)
+    except:
+        pval = None
     return {
         "BETA": float(es),
         "SE": float(se),
@@ -64,10 +70,11 @@ with gzip.open(vcf_path, 'rt') if vcf_path.endswith('.gz') else open(vcf_path, '
             continue
 
         fields = line.strip().split("\t")
+        if len(fields) <= sample_col:
+            continue
         chrom, pos, snp_id, ref, alt = fields[0], fields[1], fields[2], fields[3], fields[4]
         try:
-            sample_data = fields[sample_col]
-            stats = parse_sample_field(sample_data)
+            stats = parse_sample_field(fields[sample_col])
             writer.writerow({
                 "SNP": stats["SNP"],
                 "CHR": chrom,
@@ -93,11 +100,16 @@ if [[ "$FORMAT" == "vcf" ]]; then
   [[ ! -f "$VCF_EXPOSURE" ]] && echo "❌ ERROR: Exposure VCF not found: $VCF_EXPOSURE" && exit 1
   [[ ! -f "$VCF_OUTCOME" ]] && echo "❌ ERROR: Outcome VCF not found: $VCF_OUTCOME" && exit 1
 
+  read -rp "🧪 Are the p-values in the VCF encoded as -log10(p)? [y/n]: " LOG10_FLAG
+  LOG10_FLAG=$(echo "$LOG10_FLAG" | tr '[:upper:]' '[:lower:]')
+  parse_log10="true"
+  [[ "$LOG10_FLAG" == "n" ]] && parse_log10="false"
+
   EXPOSURE_PATH="./tmp_exposure.csv"
   OUTCOME_PATH="./tmp_outcome.csv"
 
-  convert_vcf_to_csv "$VCF_EXPOSURE" "$EXPOSURE_PATH"
-  convert_vcf_to_csv "$VCF_OUTCOME" "$OUTCOME_PATH"
+  convert_vcf_to_csv "$VCF_EXPOSURE" "$EXPOSURE_PATH" "$parse_log10"
+  convert_vcf_to_csv "$VCF_OUTCOME" "$OUTCOME_PATH" "$parse_log10"
 
 elif [[ "$FORMAT" == "csv" ]]; then
   read -rp "📥 Enter path to Exposure GWAS summary stats (.csv or .tsv): " EXPOSURE_PATH
