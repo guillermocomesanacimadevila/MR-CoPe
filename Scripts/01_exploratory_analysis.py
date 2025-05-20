@@ -122,7 +122,7 @@ def manhattan_plot(df, output_path, title):
         return
 
     df = df.dropna(subset=["CHR", "BP", "PVALUE"])
-    df = df[df["PVALUE"] > 0]  # ← filter out zero or invalid p-values
+    df = df[df["PVALUE"] > 0]
 
     if df.empty:
         print(f"❌ Skipping Manhattan plot — no valid data points in {title}.")
@@ -130,7 +130,6 @@ def manhattan_plot(df, output_path, title):
 
     df["-log10(PVALUE)"] = -np.log10(df["PVALUE"])
     df["CHR"] = df["CHR"].astype(str)
-
     df = df.sort_values(["CHR", "BP"])
     df["ind"] = range(len(df))
     df_grouped = df.groupby("CHR")
@@ -141,88 +140,69 @@ def manhattan_plot(df, output_path, title):
     x_labels_pos = []
 
     for i, (chrom, group) in enumerate(df_grouped):
-        ax.scatter(
-            group["ind"], group["-log10(PVALUE)"],
-            color=colors[i % 2],
-            s=6, alpha=0.8, edgecolor='none'
-        )
+        ax.scatter(group["ind"], group["-log10(PVALUE)"],
+                   color=colors[i % 2], s=6, alpha=0.8, edgecolor='none')
         mid_pos = (group["ind"].min() + group["ind"].max()) / 2
         x_labels.append(chrom)
         x_labels_pos.append(mid_pos)
 
-    # Significance thresholds
-    genomewide_sig = 5e-8
-    suggestive_sig = 1e-5
-    ax.axhline(y=-np.log10(genomewide_sig), color='red', linestyle='--', linewidth=1)
-    ax.axhline(y=-np.log10(suggestive_sig), color='orange', linestyle='--', linewidth=1)
+    ax.axhline(y=-np.log10(5e-8), color='red', linestyle='--', linewidth=1)
+    ax.axhline(y=-np.log10(1e-5), color='orange', linestyle='--', linewidth=1)
 
     ymax = df["-log10(PVALUE)"].max()
     ax.set_ylim([0, ymax + 0.1 * ymax])
-
     ax.set_xticks(x_labels_pos)
     ax.set_xticklabels(x_labels, fontsize=6)
     ax.set_xlim([0, len(df)])
     ax.set_xlabel("Chromosome", fontsize=10)
     ax.set_ylabel("-log10(p)", fontsize=10)
     ax.set_title(title, fontsize=12, weight='bold', pad=15)
-
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.tick_params(axis='y', labelsize=7)
     ax.tick_params(axis='x', labelsize=6)
     ax.legend().set_visible(False)
-
     plt.tight_layout()
     plt.savefig(output_path, dpi=300)
     plt.close()
     print(f"✅ Manhattan plot saved: {output_path}\n")
-    
-def qq_plot(df, output_path, title):
 
+def qq_plot(df, output_path, title):
     if "PVALUE" not in df.columns:
         print(f"❌ Cannot plot Q-Q — PVALUE column missing in {title}.")
         return
 
-    # Clean and sort p-values
     pvals = df["PVALUE"].dropna()
     pvals = np.clip(pvals, 1e-300, 1.0)
     n = len(pvals)
     expected = -np.log10(np.linspace(1 / (n + 1), 1, n))
     observed = -np.log10(np.sort(pvals))
 
-    # Confidence interval (95%) under null
     quantiles = np.arange(1, n + 1) / (n + 1)
     ci_low = -np.log10(stats.beta.ppf(0.025, quantiles * n, (1 - quantiles) * n))
     ci_high = -np.log10(stats.beta.ppf(0.975, quantiles * n, (1 - quantiles) * n))
 
-    # Genomic inflation factor (lambda GC)
     chisq = stats.chi2.isf(pvals, df=1)
     lambda_gc = np.median(chisq) / stats.chi2.ppf(0.5, df=1)
 
-    # Color gradient
     cmap = plt.cm.viridis_r
     colors = cmap(np.linspace(0.1, 0.85, n))
 
-    # Plot
     plt.figure(figsize=(7.5, 7.5), dpi=400)
     plt.fill_between(expected, ci_low, ci_high, color="#EAEAF2", alpha=0.6, label="95% CI")
-    plt.scatter(expected, observed, c=colors, s=10, edgecolor='none', alpha=0.8, label="Observed p-values")
+    plt.scatter(expected, observed, c=colors, s=10, edgecolor='none', alpha=0.8)
     plt.plot([0, max(expected)], [0, max(expected)], linestyle="--", color="black", linewidth=1.3)
-
     plt.xlabel(r"Expected $-\log_{10}$(P)", fontsize=13, weight="bold")
     plt.ylabel(r"Observed $-\log_{10}$(P)", fontsize=13, weight="bold")
     plt.title(title, fontsize=16, weight="bold", pad=10)
-
     plt.text(0.95, 0.05, f"$\\lambda_{{GC}}$ = {lambda_gc:.3f}",
              transform=plt.gca().transAxes, fontsize=11,
              ha="right", va="bottom",
              bbox=dict(facecolor='white', edgecolor='gray', boxstyle='round,pad=0.4'))
-
     plt.grid(True, linestyle=':', linewidth=0.5, alpha=0.6)
     plt.xticks(fontsize=11)
     plt.yticks(fontsize=11)
     plt.legend(frameon=False, fontsize=10, loc="upper left")
-
     plt.tight_layout()
     plt.savefig(output_path, dpi=400)
     plt.close()
@@ -251,8 +231,15 @@ def main():
 
     validate_inputs(exposure_path, outcome_path, output_dir)
 
+    log10_flag = input("🧪 Are the p-values in your input files already -log10(p)? [y/n]: ").strip().lower()
+
     exposure = load_gwas(exposure_path, "Exposure")
     outcome = load_gwas(outcome_path, "Outcome")
+
+    if log10_flag == "y":
+        print("🧼 Converting -log10(p) back to p-values for plotting...")
+        exposure["PVALUE"] = 10 ** (-exposure["PVALUE"])
+        outcome["PVALUE"] = 10 ** (-outcome["PVALUE"])
 
     qc_report(exposure, "Exposure")
     qc_report(outcome, "Outcome")
