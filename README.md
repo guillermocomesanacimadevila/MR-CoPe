@@ -2,6 +2,8 @@
 
 A reproducible and scalable pipeline for Mendelian Randomisation analysis using summary-level GWAS data.
 
+<img src="https://github.com/user-attachments/assets/68086e08-b804-4de2-9f9f-30eec59d2c04" width="300" alt="Mendelian Randomisation Diagram" />
+
 ---
 
 ### 👥 Authors
@@ -41,7 +43,7 @@ A reproducible and scalable pipeline for Mendelian Randomisation analysis using 
 
 ---
 
-## 🚀 Run the Pipeline 
+## 🚀 Run MR-CoPe
 
 Follow the steps below to set up and run the MR-CoPe pipeline.
 
@@ -58,7 +60,7 @@ cd MR-CoPe
 $($(find / -name nextflow -type f 2>/dev/null | head -n 1))
 ```
 
-### 3. Run the Pipeline
+### 3. Run MR-CoPe
 
 ```bash
 chmod +x run_mrcope.sh && ./run_mrcope.sh
