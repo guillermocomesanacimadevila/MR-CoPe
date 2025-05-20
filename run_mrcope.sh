@@ -11,121 +11,63 @@
 #   It supports CSV/TSV or VCF (gzipped or not) input formats, with p-value logic.
 ###############################################################################
 
-set -e
+set -e  # Exit on any error
 
 echo ""
 echo "🧬 Welcome to MR-CoPe: Mendelian Randomisation Pipeline"
 echo "--------------------------------------------------------"
 
-# ------------------------ Input Format Prompt ------------------------
+# ------------------------ Input Format ------------------------
 
-read -rp "🧬 Do you have VCF files or CSV/TSV summary stats? [vcf/csv]: " FORMAT
-FORMAT=$(echo "$FORMAT" | tr '[:upper:]' '[:lower:]')
+read -rp "🧬 Do you have VCF files or CSV/TSV summary stats? [vcf/csv]: " INPUT_TYPE
+INPUT_TYPE=$(echo "$INPUT_TYPE" | tr '[:upper:]' '[:lower:]')
 
-convert_vcf_to_csv() {
-  local input_vcf="$1"
-  local output_csv="$2"
-  local is_log10="$3"
+if [[ "$INPUT_TYPE" != "vcf" && "$INPUT_TYPE" != "csv" ]]; then
+  echo "❌ ERROR: Unknown input format '$INPUT_TYPE'. Please enter 'vcf' or 'csv'."
+  exit 1
+fi
 
-  echo "🔄 Parsing VCF: $input_vcf → $output_csv"
+# ------------------------ Handle VCF ------------------------
 
-  python3 - <<EOF
-import gzip
-import csv
-import sys
+if [[ "$INPUT_TYPE" == "vcf" ]]; then
+  read -rp "📥 Enter path to Exposure VCF (.vcf or .vcf.gz): " EXPOSURE_PATH
+  read -rp "📥 Enter path to Outcome VCF (.vcf or .vcf.gz): " OUTCOME_PATH
 
-vcf_path = "$input_vcf"
-csv_path = "$output_csv"
-is_log10 = ${is_log10,,} == "true"
+  if [[ ! -f "$EXPOSURE_PATH" || ! -f "$OUTCOME_PATH" ]]; then
+    echo "❌ ERROR: One or both VCF files not found."
+    exit 1
+  fi
 
-def parse_sample_field(field):
-    es, se, lp, af, rsid = field.split(":")
-    try:
-        pval = 10 ** (-float(lp)) if is_log10 else float(lp)
-    except:
-        pval = None
-    return {
-        "BETA": float(es),
-        "SE": float(se),
-        "PVALUE": pval,
-        "EAF": float(af),
-        "SNP": rsid
-    }
+  read -rp "🧪 Are the p-values in the VCF encoded as -log10(p)? [y/n]: " LOG10_INPUT
+  IS_LOG10="false"
+  if [[ "$LOG10_INPUT" == [Yy] ]]; then
+    IS_LOG10="true"
+  fi
 
-with gzip.open(vcf_path, 'rt') if vcf_path.endswith('.gz') else open(vcf_path, 'r') as vcf_in, \
-     open(csv_path, 'w', newline='') as csv_out:
+  echo "🔄 Parsing VCF: $EXPOSURE_PATH → ./tmp_exposure.csv"
+  python3 Scripts/parse_vcf.py "$EXPOSURE_PATH" "./tmp_exposure.csv" "$IS_LOG10"
 
-    writer = None
-    for line in vcf_in:
-        if line.startswith("##"):
-            continue
-        if line.startswith("#CHROM"):
-            header = line.strip().lstrip("#").split("\t")
-            format_col = header.index("FORMAT")
-            sample_col = format_col + 1
-            writer = csv.DictWriter(csv_out, fieldnames=[
-                "SNP", "CHR", "BP", "A1", "A2", "BETA", "SE", "PVALUE", "EAF"
-            ])
-            writer.writeheader()
-            continue
-
-        fields = line.strip().split("\t")
-        if len(fields) <= sample_col:
-            continue
-        chrom, pos, snp_id, ref, alt = fields[0], fields[1], fields[2], fields[3], fields[4]
-        try:
-            stats = parse_sample_field(fields[sample_col])
-            writer.writerow({
-                "SNP": stats["SNP"],
-                "CHR": chrom,
-                "BP": pos,
-                "A1": alt,
-                "A2": ref,
-                "BETA": stats["BETA"],
-                "SE": stats["SE"],
-                "PVALUE": stats["PVALUE"],
-                "EAF": stats["EAF"]
-            })
-        except Exception as e:
-            print(f"⚠️ Skipping line at position {pos}: {e}")
-EOF
-}
-
-# ------------------------ Input Collection ------------------------
-
-if [[ "$FORMAT" == "vcf" ]]; then
-  read -rp "📥 Enter path to Exposure VCF (.vcf or .vcf.gz): " VCF_EXPOSURE
-  read -rp "📥 Enter path to Outcome VCF (.vcf or .vcf.gz): " VCF_OUTCOME
-
-  [[ ! -f "$VCF_EXPOSURE" ]] && echo "❌ ERROR: Exposure VCF not found: $VCF_EXPOSURE" && exit 1
-  [[ ! -f "$VCF_OUTCOME" ]] && echo "❌ ERROR: Outcome VCF not found: $VCF_OUTCOME" && exit 1
-
-  read -rp "🧪 Are the p-values in the VCF encoded as -log10(p)? [y/n]: " LOG10_FLAG
-  LOG10_FLAG=$(echo "$LOG10_FLAG" | tr '[:upper:]' '[:lower:]')
-  parse_log10="true"
-  [[ "$LOG10_FLAG" == "n" ]] && parse_log10="false"
+  echo "🔄 Parsing VCF: $OUTCOME_PATH → ./tmp_outcome.csv"
+  python3 Scripts/parse_vcf.py "$OUTCOME_PATH" "./tmp_outcome.csv" "$IS_LOG10"
 
   EXPOSURE_PATH="./tmp_exposure.csv"
   OUTCOME_PATH="./tmp_outcome.csv"
 
-  convert_vcf_to_csv "$VCF_EXPOSURE" "$EXPOSURE_PATH" "$parse_log10"
-  convert_vcf_to_csv "$VCF_OUTCOME" "$OUTCOME_PATH" "$parse_log10"
-
-elif [[ "$FORMAT" == "csv" ]]; then
-  read -rp "📥 Enter path to Exposure GWAS summary stats (.csv or .tsv): " EXPOSURE_PATH
-  read -rp "📥 Enter path to Outcome GWAS summary stats (.csv or .tsv): " OUTCOME_PATH
-
-  [[ ! -f "$EXPOSURE_PATH" ]] && echo "❌ ERROR: Exposure file not found: $EXPOSURE_PATH" && exit 1
-  [[ ! -f "$OUTCOME_PATH" ]] && echo "❌ ERROR: Outcome file not found: $OUTCOME_PATH" && exit 1
+# ------------------------ Handle CSV/TSV ------------------------
 
 else
-  echo "❌ ERROR: Unknown input format '$FORMAT'. Please enter 'vcf' or 'csv'."
-  exit 1
+  read -rp "📥 Enter path to Exposure GWAS summary statistics (.csv or .tsv): " EXPOSURE_PATH
+  read -rp "📥 Enter path to Outcome GWAS summary statistics (.csv or .tsv): " OUTCOME_PATH
+
+  if [[ ! -f "$EXPOSURE_PATH" || ! -f "$OUTCOME_PATH" ]]; then
+    echo "❌ ERROR: One or both summary stat files not found."
+    exit 1
+  fi
 fi
 
 echo ""
-echo "📁 Exposure input: $EXPOSURE_PATH"
-echo "📁 Outcome input : $OUTCOME_PATH"
+echo "📁 Exposure: $EXPOSURE_PATH"
+echo "📁 Outcome : $OUTCOME_PATH"
 echo "--------------------------------------------------------"
 
 # ------------------------ Dependency Checks ------------------------
