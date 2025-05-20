@@ -8,7 +8,7 @@
 #
 # Description:
 #   This script launches the MR-CoPe pipeline using Docker and Nextflow.
-#   It prompts the user for GWAS input files and executes the full workflow.
+#   It supports both CSV/TSV and VCF (gzipped or not) as inputs.
 ###############################################################################
 
 set -e  # Exit on any error
@@ -17,17 +17,67 @@ echo ""
 echo "🧬 Welcome to MR-CoPe: Mendelian Randomisation Pipeline"
 echo "--------------------------------------------------------"
 
+# ------------------------ Input Format Prompt ------------------------
+
+read -rp "🧬 Do you have a VCF file or CSV/TSV summary stats? [vcf/csv]: " FORMAT
+FORMAT=$(echo "$FORMAT" | tr '[:upper:]' '[:lower:]')
+
+convert_vcf_to_csv() {
+  local input_vcf="$1"
+  local output_csv="$2"
+  echo "🔄 Converting VCF to CSV: $input_vcf → $output_csv"
+
+  python3 - <<EOF
+import gzip
+import csv
+
+vcf_path = "$input_vcf"
+csv_path = "$output_csv"
+
+with gzip.open(vcf_path, 'rt') if vcf_path.endswith('.gz') else open(vcf_path, 'r') as vcf_in, \
+     open(csv_path, 'w', newline='') as csv_out:
+
+    writer = None
+    for line in vcf_in:
+        if line.startswith("##"):
+            continue
+        if line.startswith("#CHROM"):
+            headers = line.strip().lstrip("#").split('\t')
+            writer = csv.DictWriter(csv_out, fieldnames=headers)
+            writer.writeheader()
+            continue
+        fields = line.strip().split('\t')
+        record = dict(zip(headers, fields))
+        writer.writerow(record)
+
+print("✅ VCF successfully converted to CSV:", csv_path)
+EOF
+}
+
 # ------------------------ Input Collection ------------------------
 
-read -rp "📥 Enter path to Exposure GWAS summary statistics (.csv or .tsv): " EXPOSURE_PATH
-if [[ ! -f "$EXPOSURE_PATH" ]]; then
-  echo "❌ ERROR: Exposure file not found at: $EXPOSURE_PATH"
-  exit 1
-fi
+if [[ "$FORMAT" == "vcf" ]]; then
+  read -rp "📥 Enter path to Exposure VCF (.vcf or .vcf.gz): " VCF_EXPOSURE
+  read -rp "📥 Enter path to Outcome VCF (.vcf or .vcf.gz): " VCF_OUTCOME
 
-read -rp "📥 Enter path to Outcome GWAS summary statistics (.csv or .tsv): " OUTCOME_PATH
-if [[ ! -f "$OUTCOME_PATH" ]]; then
-  echo "❌ ERROR: Outcome file not found at: $OUTCOME_PATH"
+  [[ ! -f "$VCF_EXPOSURE" ]] && echo "❌ ERROR: Exposure VCF not found: $VCF_EXPOSURE" && exit 1
+  [[ ! -f "$VCF_OUTCOME" ]] && echo "❌ ERROR: Outcome VCF not found: $VCF_OUTCOME" && exit 1
+
+  EXPOSURE_PATH="./tmp_exposure.csv"
+  OUTCOME_PATH="./tmp_outcome.csv"
+
+  convert_vcf_to_csv "$VCF_EXPOSURE" "$EXPOSURE_PATH"
+  convert_vcf_to_csv "$VCF_OUTCOME" "$OUTCOME_PATH"
+
+elif [[ "$FORMAT" == "csv" ]]; then
+  read -rp "📥 Enter path to Exposure GWAS summary statistics (.csv or .tsv): " EXPOSURE_PATH
+  read -rp "📥 Enter path to Outcome GWAS summary statistics (.csv or .tsv): " OUTCOME_PATH
+
+  [[ ! -f "$EXPOSURE_PATH" ]] && echo "❌ ERROR: Exposure file not found at: $EXPOSURE_PATH" && exit 1
+  [[ ! -f "$OUTCOME_PATH" ]] && echo "❌ ERROR: Outcome file not found at: $OUTCOME_PATH" && exit 1
+
+else
+  echo "❌ ERROR: Unknown input format '$FORMAT'. Please enter 'vcf' or 'csv'."
   exit 1
 fi
 
