@@ -86,13 +86,13 @@ def load_gwas(path, label):
     print(f"📅 Loading {label} GWAS: {path}")
     sep = "\t" if path.endswith((".tsv", ".txt")) else ","
     df = pd.read_csv(path, sep=sep)
-    df.columns = df.columns.str.strip()
+    df.columns = df.columns.str.strip().str.upper()  # <<< FIXED HERE
     print(f"✅ Loaded {label} GWAS | Shape: {df.shape}\n")
 
     mapping = auto_map_columns(df, label)
 
     if not all(k in mapping for k in ["SNP", "CHR", "BP", "PVALUE"]):
-        if {"riskAllele", "locations", "pValue"}.issubset(df.columns):
+        if {"RISKALLELE", "LOCATIONS", "PVALUE"}.issubset(df.columns):
             df = parse_custom_gwas(df, label)
         else:
             print(f"❌ ERROR: Missing critical columns in {label} GWAS and no fallback possible.")
