@@ -4,8 +4,10 @@ nextflow.enable.dsl=2
 
 // PARAMETERS
 params.output_dir  = "./results"
-params.script_dir  = "./Scripts"  // Folder where your scripts are located
+params.script_dir  = "./"  // Folder where your scripts are located
+params.log10_flag  = "n"   // <-- new param to pass to exploratory_analysis
 
+// SCRIPTS
 workflow {
 
     def script_explore   = file("${params.script_dir}/01_exploratory_analysis.py")
@@ -55,7 +57,7 @@ process exploratory_analysis {
 
     script:
     """
-    python3 ${script} ${exposure} ${outcome} ${params.output_dir}
+    python3 ${script} ${exposure} ${outcome} ${params.output_dir} ${params.log10_flag}
     """
 }
 
