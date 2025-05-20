@@ -11,12 +11,13 @@ Performs QC checks and generates Manhattan plots for exposure and outcome
 GWAS summary statistics provided by the user.
 
 Usage:
-    python3 01_exploratory_analysis.py <exposure_gwas.csv> <outcome_gwas.csv> <output_dir>
+    python3 01_exploratory_analysis.py <exposure_gwas.csv> <outcome_gwas.csv> <output_dir> <log10_flag>
 
 Inputs:
     - exposure_gwas.csv : Exposure GWAS summary statistics
     - outcome_gwas.csv  : Outcome GWAS summary statistics
     - output_dir        : Directory to save output files
+    - log10_flag        : "y" if p-values are already -log10(p), else "n"
 """
 
 import os
@@ -116,7 +117,7 @@ def qc_report(df, label):
     print(df.isna().sum())
     print("\n")
 
-def manhattan_plot(df, output_path, title):
+def manhattan_plot(df, output_path, title, is_log10_input=False):
     if "PVALUE" not in df.columns:
         print(f"❌ Cannot plot Manhattan — PVALUE column missing in {title}.")
         return
@@ -124,11 +125,11 @@ def manhattan_plot(df, output_path, title):
     df = df.dropna(subset=["CHR", "BP", "PVALUE"])
     df = df[df["PVALUE"] > 0]
 
-    if df.empty:
-        print(f"❌ Skipping Manhattan plot — no valid data points in {title}.")
-        return
+    if not is_log10_input:
+        df["-log10(PVALUE)"] = -np.log10(df["PVALUE"])
+    else:
+        df["-log10(PVALUE)"] = df["PVALUE"]
 
-    df["-log10(PVALUE)"] = -np.log10(df["PVALUE"])
     df["CHR"] = df["CHR"].astype(str)
     df = df.sort_values(["CHR", "BP"])
     df["ind"] = range(len(df))
@@ -136,12 +137,14 @@ def manhattan_plot(df, output_path, title):
 
     fig, ax = plt.subplots(figsize=(12, 6), dpi=300)
     colors = ["#4C72B0", "#55A868"]
-    x_labels = []
-    x_labels_pos = []
+    x_labels, x_labels_pos = [], []
 
     for i, (chrom, group) in enumerate(df_grouped):
-        ax.scatter(group["ind"], group["-log10(PVALUE)"],
-                   color=colors[i % 2], s=6, alpha=0.8, edgecolor='none')
+        ax.scatter(
+            group["ind"], group["-log10(PVALUE)"],
+            color=colors[i % 2],
+            s=6, alpha=0.8, edgecolor='none'
+        )
         mid_pos = (group["ind"].min() + group["ind"].max()) / 2
         x_labels.append(chrom)
         x_labels_pos.append(mid_pos)
@@ -162,6 +165,7 @@ def manhattan_plot(df, output_path, title):
     ax.tick_params(axis='y', labelsize=7)
     ax.tick_params(axis='x', labelsize=6)
     ax.legend().set_visible(False)
+
     plt.tight_layout()
     plt.savefig(output_path, dpi=300)
     plt.close()
@@ -192,17 +196,21 @@ def qq_plot(df, output_path, title):
     plt.fill_between(expected, ci_low, ci_high, color="#EAEAF2", alpha=0.6, label="95% CI")
     plt.scatter(expected, observed, c=colors, s=10, edgecolor='none', alpha=0.8)
     plt.plot([0, max(expected)], [0, max(expected)], linestyle="--", color="black", linewidth=1.3)
+
     plt.xlabel(r"Expected $-\log_{10}$(P)", fontsize=13, weight="bold")
     plt.ylabel(r"Observed $-\log_{10}$(P)", fontsize=13, weight="bold")
     plt.title(title, fontsize=16, weight="bold", pad=10)
+
     plt.text(0.95, 0.05, f"$\\lambda_{{GC}}$ = {lambda_gc:.3f}",
              transform=plt.gca().transAxes, fontsize=11,
              ha="right", va="bottom",
              bbox=dict(facecolor='white', edgecolor='gray', boxstyle='round,pad=0.4'))
+
     plt.grid(True, linestyle=':', linewidth=0.5, alpha=0.6)
     plt.xticks(fontsize=11)
     plt.yticks(fontsize=11)
     plt.legend(frameon=False, fontsize=10, loc="upper left")
+
     plt.tight_layout()
     plt.savefig(output_path, dpi=400)
     plt.close()
@@ -219,11 +227,12 @@ def validate_inputs(exposure_path, outcome_path, output_dir):
         os.makedirs(output_dir, exist_ok=True)
 
 def main():
-    if len(sys.argv) != 4:
+    if len(sys.argv) != 5:
         print(__doc__)
         sys.exit(1)
 
-    exposure_path, outcome_path, output_dir = sys.argv[1], sys.argv[2], sys.argv[3]
+    exposure_path, outcome_path, output_dir, log10_flag_input = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+    is_log10_input = log10_flag_input.lower().startswith("y")
 
     print("\n" + "=" * 60)
     print("MR-CoPe | Exploratory Analysis of GWAS Summary Statistics")
@@ -231,22 +240,15 @@ def main():
 
     validate_inputs(exposure_path, outcome_path, output_dir)
 
-    log10_flag = input("🧪 Are the p-values in your input files already -log10(p)? [y/n]: ").strip().lower()
-
     exposure = load_gwas(exposure_path, "Exposure")
     outcome = load_gwas(outcome_path, "Outcome")
-
-    if log10_flag == "y":
-        print("🧼 Converting -log10(p) back to p-values for plotting...")
-        exposure["PVALUE"] = 10 ** (-exposure["PVALUE"])
-        outcome["PVALUE"] = 10 ** (-outcome["PVALUE"])
 
     qc_report(exposure, "Exposure")
     qc_report(outcome, "Outcome")
 
     print("📊 Generating Manhattan and Q-Q plots...\n")
-    manhattan_plot(exposure, os.path.join(output_dir, "exposure_manhattan.png"), "Exposure GWAS Manhattan Plot")
-    manhattan_plot(outcome, os.path.join(output_dir, "outcome_manhattan.png"), "Outcome GWAS Manhattan Plot")
+    manhattan_plot(exposure, os.path.join(output_dir, "exposure_manhattan.png"), "Exposure GWAS Manhattan Plot", is_log10_input)
+    manhattan_plot(outcome, os.path.join(output_dir, "outcome_manhattan.png"), "Outcome GWAS Manhattan Plot", is_log10_input)
 
     qq_plot(exposure, os.path.join(output_dir, "exposure_qq.png"), "Exposure GWAS Q-Q Plot")
     qq_plot(outcome, os.path.join(output_dir, "outcome_qq.png"), "Outcome GWAS Q-Q Plot")
