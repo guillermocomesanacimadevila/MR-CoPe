@@ -42,7 +42,7 @@ workflow {
 // =============================== PROCESSES ===============================
 
 process exploratory_analysis {
-    publishDir "${params.output_dir}", mode: 'copy'
+    publishDir "${params.output_dir}", mode: 'copy', overwrite: true
 
     input:
     path script
@@ -62,7 +62,7 @@ process exploratory_analysis {
 }
 
 process gwas_processing {
-    publishDir "${params.output_dir}", mode: 'copy'
+    publishDir "${params.output_dir}", mode: 'copy', overwrite: true
 
     input:
     path script
@@ -79,7 +79,7 @@ process gwas_processing {
 }
 
 process ld_filtering {
-    publishDir "${params.output_dir}", mode: 'copy'
+    publishDir "${params.output_dir}", mode: 'copy', overwrite: true
 
     input:
     path script
@@ -95,7 +95,7 @@ process ld_filtering {
 }
 
 process mr_analysis {
-    publishDir "${params.output_dir}", mode: 'copy'
+    publishDir "${params.output_dir}", mode: 'copy', overwrite: true
 
     input:
     path script
@@ -113,7 +113,7 @@ process mr_analysis {
 }
 
 process visualisation_summary {
-    publishDir "${params.output_dir}", mode: 'copy'
+    publishDir "${params.output_dir}", mode: 'copy', overwrite: true
 
     input:
     path script
@@ -132,7 +132,7 @@ process visualisation_summary {
 }
 
 process visualisation_scatter {
-    publishDir "${params.output_dir}", mode: 'copy'
+    publishDir "${params.output_dir}", mode: 'copy', overwrite: true
 
     input:
     path script
