@@ -44,8 +44,14 @@ cat("\n==============================================================\n")
 cat("MR-CoPe | Combined MR Scatter + Leave-One-Out\n")
 cat("==============================================================\n\n")
 
+# ---- Empty File Check ----
 if (!file.exists(input_file)) {
   stop(paste("❌ ERROR: Input file not found:", input_file))
+}
+
+if (file.info(input_file)$size == 0) {
+  cat("⚠️  Skipping scatter plot — harmonised data is empty.\n")
+  quit(status = 0)
 }
 
 dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
@@ -141,4 +147,4 @@ cat("✅ Saved:", loo_path, "\n")
 
 cat("\n🎉 All visualisations complete!\n")
 cat("All outputs saved in:", output_dir)
-cat("==============================================================\n\n")
+cat("==============================================================\n\n"
