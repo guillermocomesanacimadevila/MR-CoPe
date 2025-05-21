@@ -38,7 +38,7 @@ AUTO_COLUMN_MAP = {
     'A2': ['a2', 'other_allele', 'oa', 'ref'],
     'BETA': ['beta', 'effect_size', 'b'],
     'SE': ['se', 'stderr', 'standard_error'],
-    'PVALUE': ['pval', 'p_value', 'p'],
+    'PVALUE': ['pval', 'p_value', 'p', 'pvalue'],  
     'EAF': ['eaf', 'effect_allele_freq', 'freq', 'riskfrequency', 'maf']
 }
 
