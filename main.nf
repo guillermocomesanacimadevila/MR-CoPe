@@ -4,8 +4,10 @@ nextflow.enable.dsl=2
 
 // PARAMETERS
 params.output_dir  = "./results"
-params.script_dir  = "./"  // Folder where your scripts are located
-params.log10_flag  = "n"   // <-- new param to pass to exploratory_analysis
+params.script_dir  = "./"     // Folder where your scripts are located
+params.log10_flag  = "n"      // Indicates if input p-values are already -log10(p)
+params.clump_kb    = 10000    // LD clumping window in kb (default)
+params.clump_r2    = 0.001    // LD clumping r2 threshold (default)
 
 // SCRIPTS
 workflow {
@@ -90,7 +92,7 @@ process ld_filtering {
 
     script:
     """
-    Rscript ${script} ${filtered} ld_pruned_SNPs.csv
+    Rscript ${script} ${filtered} ld_pruned_SNPs.csv ${params.clump_kb} ${params.clump_r2}
     """
 }
 
