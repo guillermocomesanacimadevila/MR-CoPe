@@ -10,12 +10,10 @@
 # the TwoSampleMR::ld_clump() function, using the 1000 Genomes EUR panel.
 #
 # Usage:
-#   Rscript 03_linkage_disequillibrium.R <input_filtered_SNPs.csv> <output_ld_pruned.csv>
+#   Rscript 03_linkage_disequillibrium.R <input_filtered_SNPs.csv> <output_ld_pruned.csv> <clump_kb> <clump_r2>
 #
 # Notes:
 # - Requires 'SNP' and 'PVALUE_exp' columns in the input file
-# - Uses 10,000 kb window, r2 = 0.001 threshold
-# - Will exit gracefully if no SNPs survive LD pruning
 # ===================================================================
 
 suppressPackageStartupMessages({
@@ -29,14 +27,16 @@ suppressPackageStartupMessages({
 
 args <- commandArgs(trailingOnly = TRUE)
 
-if (length(args) != 2) {
+if (length(args) != 4) {
   cat("\n❌ ERROR: Incorrect number of arguments.\n")
-  cat("Usage: Rscript 03_linkage_disequillibrium.R <input_filtered_SNPs.csv> <output_ld_pruned.csv>\n\n")
+  cat("Usage: Rscript 03_linkage_disequillibrium.R <input_filtered_SNPs.csv> <output_ld_pruned.csv> <clump_kb> <clump_r2>\n\n")
   quit(status = 1)
 }
 
 input_file  <- args[1]
 output_file <- args[2]
+clump_kb    <- as.numeric(args[3])
+clump_r2    <- as.numeric(args[4])
 
 # ------------------ Banner ------------------ #
 
@@ -79,15 +79,15 @@ clump_input <- gwas %>%
 # ------------------ Perform Clumping ------------------ #
 
 cat("🔗 Performing LD clumping with parameters:\n")
-cat("   ➤ Window     : 10,000 kb\n")
-cat("   ➤ R² cutoff  : 0.001\n")
+cat("   ➤ Window     :", clump_kb, "kb\n")
+cat("   ➤ R² cutoff  :", clump_r2, "\n")
 cat("   ➤ P-value    : 1.0 (include all SNPs)\n\n")
 
 clumped <- tryCatch({
   ld_clump(
     clump_input,
-    clump_kb = 10000,
-    clump_r2 = 0.001,
+    clump_kb = clump_kb,
+    clump_r2 = clump_r2,
     clump_p = 1.0
   )
 }, error = function(e) {
