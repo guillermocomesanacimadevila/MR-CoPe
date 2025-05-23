@@ -198,8 +198,8 @@ if ! [[ "$CLUMP_KB" =~ ^[0-9]+$ ]]; then
   echo "❌ Invalid clump_kb value. Must be an integer."
   exit 1
 fi
-if ! [[ "$CLUMP_R2" =~ ^0(\.\d+)?$ ]]; then
-  echo "❌ Invalid clump_r2 value. Must be a decimal between 0 and 1."
+if ! awk "BEGIN {exit !($CLUMP_R2 > 0 && $CLUMP_R2 <= 1)}"; then
+  echo "❌ Invalid clump_r2 value. Must be a number > 0 and ≤ 1 (e.g., 0.01, 1.0)."
   exit 1
 fi
 
