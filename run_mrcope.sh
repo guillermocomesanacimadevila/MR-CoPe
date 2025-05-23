@@ -182,9 +182,32 @@ else
   LOG10_FLAG=$(echo "$LOG10_FLAG" | tr '[:upper:]' '[:lower:]')
 fi
 
+# ------------------------ LD Clumping Settings ------------------------
+
 echo ""
-echo "📁 Exposure: $EXPOSURE_PATH"
-echo "📁 Outcome : $OUTCOME_PATH"
+echo "📊 LD Clumping Settings:"
+echo "   - These affect SNP pruning based on correlation (LD)."
+echo "   - More relaxed values will keep more SNPs."
+read -rp "📏 LD clumping window size in kb (default: 10000): " CLUMP_KB
+read -rp "🔗 LD clumping r² threshold (default: 0.001): " CLUMP_R2
+
+CLUMP_KB="${CLUMP_KB:-10000}"
+CLUMP_R2="${CLUMP_R2:-0.001}"
+
+if ! [[ "$CLUMP_KB" =~ ^[0-9]+$ ]]; then
+  echo "❌ Invalid clump_kb value. Must be an integer."
+  exit 1
+fi
+if ! [[ "$CLUMP_R2" =~ ^0(\.\d+)?$ ]]; then
+  echo "❌ Invalid clump_r2 value. Must be a decimal between 0 and 1."
+  exit 1
+fi
+
+echo ""
+echo "📁 Exposure file : $EXPOSURE_PATH"
+echo "📁 Outcome file  : $OUTCOME_PATH"
+echo "📏 LD window (kb): $CLUMP_KB"
+echo "🔗 LD r² cutoff  : $CLUMP_R2"
 echo "--------------------------------------------------------"
 
 # ------------------------ Dependency Checks ------------------------
@@ -209,7 +232,7 @@ IMAGE_NAME="mrcope:latest"
 if ! docker image inspect "$IMAGE_NAME" > /dev/null 2>&1; then
   echo ""
   echo "🐳 Docker image '$IMAGE_NAME' not found locally."
-  read -rp "🔧 Would you like to build it now from Dockerfile? [y/N]: " BUILD_CHOICE
+  read -rp "🔧 Build image from Dockerfile now? [y/N]: " BUILD_CHOICE
   if [[ "$BUILD_CHOICE" =~ ^[Yy]$ ]]; then
     docker build -t "$IMAGE_NAME" .
     echo "✅ Docker image '$IMAGE_NAME' built successfully."
@@ -227,6 +250,8 @@ nextflow run main.nf -with-docker "$IMAGE_NAME" \
     --exposure "$EXPOSURE_PATH" \
     --outcome "$OUTCOME_PATH" \
     --log10_flag "$LOG10_FLAG" \
+    --clump_kb "$CLUMP_KB" \
+    --clump_r2 "$CLUMP_R2" \
     --output_dir "./results" \
     -resume
 
