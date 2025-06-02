@@ -34,10 +34,10 @@ RUN pip install --upgrade pip && pip install \
 # -----------------------------
 # Install base R packages from CRAN
 # -----------------------------
-RUN Rscript -e "install.packages(c( \
+    RUN Rscript -e "install.packages(c( \
     'devtools', 'optparse', 'qqman', 'ggrepel', 'data.table', \
     'patchwork', 'RColorBrewer', 'MASS', 'Matrix', 'gridExtra', 'lattice', \
-    'stringr', 'purrr', 'plyr', 'tidyr', 'remotes' \
+    'stringr', 'purrr', 'plyr', 'tidyr', 'remotes', 'httr' \
 ), repos='https://cloud.r-project.org')"
 
 # -----------------------------
