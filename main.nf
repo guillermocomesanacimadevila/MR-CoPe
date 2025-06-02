@@ -2,46 +2,51 @@
 
 nextflow.enable.dsl=2
 
-// PARAMETERS
-params.output_dir  = "./results"
-params.script_dir  = "./"     // Folder where your scripts are located
-params.log10_flag  = "n"      // Indicates if input p-values are already -log10(p)
-params.clump_kb    = 10000    // LD clumping window in kb (default)
-params.clump_r2    = 0.001    // LD clumping r2 threshold (default)
+// ========================== PARAMETERS ==========================
+params.output_dir     = "./results"
+params.script_dir     = "./"
+params.log10_flag     = "n"              // Are input p-values already -log10(p)?
+params.clump_kb       = 10000            // LD window in kb
+params.clump_r2       = 0.001            // LD clumping threshold
+params.trait_keyword  = null             // Trait to retain (e.g., "CRP", "LDL")
 
-// SCRIPTS
+// ========================== SCRIPTS ==========================
 workflow {
 
-    def script_explore   = file("${params.script_dir}/01_exploratory_analysis.py")
-    def script_process   = file("${params.script_dir}/02_gwas_preprocessing.py")
-    def script_ld        = file("${params.script_dir}/03_linkage_disequillibrium.R")
-    def script_mr        = file("${params.script_dir}/04_mr_analyses.R")
-    def script_vis_sum   = file("${params.script_dir}/05_visualisations.py")
-    def script_vis_scatt = file("${params.script_dir}/06_visualisations.R")
+    def script_explore     = file("${params.script_dir}/01_exploratory_analysis.py")
+    def script_process     = file("${params.script_dir}/02_gwas_preprocessing.py")
+    def script_ld          = file("${params.script_dir}/03_linkage_disequillibrium.R")
+    def script_filter_conf = file("${params.script_dir}/04a_filter_confounders.R")
+    def script_mr          = file("${params.script_dir}/04_mr_analyses.R")
+    def script_vis_sum     = file("${params.script_dir}/05_visualisations.py")
+    def script_vis_scatt   = file("${params.script_dir}/06_visualisations.R")
 
     def exposure_file = file(params.exposure)
     def outcome_file  = file(params.outcome)
 
-    // Step 1: Exploratory analysis
+    // Step 1: Exploratory analysis (manhattan + QQ)
     exploratory_analysis(script_explore, exposure_file, outcome_file)
 
-    // Step 2: GWAS preprocessing
+    // Step 2: Preprocess GWAS (QC, merge, F-stat)
     gwas_processing(script_process, exposure_file, outcome_file)
 
     // Step 3: LD pruning
     ld_filtering(script_ld, gwas_processing.out.filtered)
 
-    // Step 4: MR analysis
-    mr_analysis(script_mr, ld_filtering.out.pruned)
+    // Step 4: Filter SNPs associated with confounding traits (PhenoScanner)
+    confounder_filtering(script_filter_conf, ld_filtering.out.pruned)
 
-    // Step 5a: Python visualisation
+    // Step 5: MR analysis
+    mr_analysis(script_mr, confounder_filtering.out.filtered)
+
+    // Step 6a: MR summary visualisation
     visualisation_summary(script_vis_sum, mr_analysis.out.summary, mr_analysis.out.snps)
 
-    // Step 5b: R scatter plots
+    // Step 6b: MR scatter plots + leave-one-out
     visualisation_scatter(script_vis_scatt, mr_analysis.out.harmonised)
 }
 
-// =============================== PROCESSES ===============================
+// ========================== PROCESSES ==========================
 
 process exploratory_analysis {
     publishDir "${params.output_dir}", mode: 'copy', overwrite: true
@@ -96,12 +101,28 @@ process ld_filtering {
     """
 }
 
-process mr_analysis {
+process confounder_filtering {
     publishDir "${params.output_dir}", mode: 'copy', overwrite: true
 
     input:
     path script
     path pruned
+
+    output:
+    path("confounder_filtered_SNPs.csv"), emit: filtered
+
+    script:
+    """
+    Rscript ${script} ${pruned} confounder_filtered_SNPs.csv "${params.trait_keyword}"
+    """
+}
+
+process mr_analysis {
+    publishDir "${params.output_dir}", mode: 'copy', overwrite: true
+
+    input:
+    path script
+    path filtered
 
     output:
     path("MR_Formatted_Results.csv"), emit: summary
@@ -110,7 +131,7 @@ process mr_analysis {
 
     script:
     """
-    Rscript ${script} ${pruned}
+    Rscript ${script} ${filtered}
     """
 }
 
