@@ -5,10 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>MR-CoPe Report</title>
 
-  <!-- Fonts & Libraries -->
+  <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
+
+  <!-- DataTables -->
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.5/css/jquery.dataTables.min.css"/>
+
+  <!-- Plotly -->
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+  <!-- jQuery + DataTables -->
   <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.5/js/jquery.dataTables.min.js"></script>
 
@@ -16,18 +22,16 @@
     :root {
       --bg-light: #f9fafb;
       --bg-dark: #1c1e21;
-      --text-light: #1a1a1a;
-      --text-dark: #e0e0e0;
-      --card-light: #ffffff;
-      --card-dark: #2a2c2f;
+      --text-light: #111;
+      --text-dark: #eee;
+      --card-bg-light: #fff;
+      --card-bg-dark: #2a2c2f;
       --accent: #007aff;
-      --shadow: rgba(0, 0, 0, 0.05);
     }
 
-    [data-theme='dark'] {
-      --bg-light: var(--bg-dark);
-      --text-light: var(--text-dark);
-      --card-light: var(--card-dark);
+    [data-theme="dark"] {
+      background-color: var(--bg-dark);
+      color: var(--text-dark);
     }
 
     * {
@@ -36,123 +40,117 @@
 
     body {
       font-family: 'Inter', sans-serif;
-      background-color: var(--bg-light);
+      background: var(--bg-light);
       color: var(--text-light);
       margin: 0;
       padding: 2rem;
-      transition: background 0.4s ease, color 0.4s ease;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    [data-theme="dark"] body {
+      background: var(--bg-dark);
+      color: var(--text-dark);
     }
 
     .container {
-      max-width: 1200px;
+      max-width: 1100px;
       margin: auto;
     }
 
     h1 {
-      font-size: 2.2rem;
-      margin-bottom: 0.5rem;
-      font-weight: 700;
-      color: var(--accent);
-    }
-
-    h2 {
-      font-size: 1.4rem;
-      margin-top: 2rem;
+      font-size: 2rem;
       margin-bottom: 1rem;
-      border-bottom: 2px solid var(--accent);
-      padding-bottom: 0.3rem;
     }
 
     .dashboard {
       display: flex;
-      flex-wrap: wrap;
       gap: 1rem;
       margin: 2rem 0;
+      flex-wrap: wrap;
     }
 
     .card {
-      background: var(--card-light);
-      border-radius: 12px;
+      background: var(--card-bg-light);
       padding: 1.5rem;
+      border-radius: 14px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.05);
       flex: 1 1 200px;
-      box-shadow: 0 2px 10px var(--shadow);
-      transition: background 0.4s;
+      transition: background 0.3s;
+    }
+
+    [data-theme="dark"] .card {
+      background: var(--card-bg-dark);
     }
 
     .card h3 {
-      margin: 0 0 0.5rem;
       font-size: 1rem;
+      margin: 0 0 0.5rem;
       color: var(--accent);
     }
 
     .section {
-      background: var(--card-light);
+      margin-bottom: 3rem;
+      background: var(--card-bg-light);
       padding: 2rem;
       border-radius: 12px;
-      margin-bottom: 2.5rem;
-      box-shadow: 0 2px 12px var(--shadow);
-      transition: background 0.4s;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+      transition: background 0.3s;
+    }
+
+    [data-theme="dark"] .section {
+      background: var(--card-bg-dark);
     }
 
     table.dataTable {
       width: 100%;
       font-size: 0.95rem;
+      background: transparent;
+    }
+
+    #scatter, #forest {
       margin-top: 1rem;
-      background-color: transparent;
     }
 
-    table.dataTable thead th {
-      background-color: var(--bg-light);
-      border-bottom: 2px solid var(--accent);
-    }
-
-    table.dataTable tbody tr:hover {
-      background-color: rgba(0, 122, 255, 0.05);
+    .footer {
+      text-align: center;
+      font-size: 0.85rem;
+      color: #888;
+      margin-top: 4rem;
     }
 
     .toggle-theme {
       position: fixed;
       top: 20px;
       right: 20px;
-      background: var(--card-light);
-      border: 1px solid #ccc;
-      padding: 0.6rem 1rem;
+      background: var(--card-bg-light);
+      border: none;
+      padding: 0.5rem 1rem;
       border-radius: 10px;
       font-weight: 600;
       cursor: pointer;
       box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      transition: all 0.3s ease;
+      transition: background 0.3s;
     }
 
-    [data-theme='dark'] .toggle-theme {
+    [data-theme="dark"] .toggle-theme {
+      background: var(--card-bg-dark);
       color: var(--text-dark);
-    }
-
-    .footer {
-      text-align: center;
-      font-size: 0.85rem;
-      opacity: 0.7;
-      margin-top: 4rem;
-    }
-
-    @media (max-width: 768px) {
-      body { padding: 1rem; }
-      .dashboard { flex-direction: column; }
     }
   </style>
 </head>
 <body>
+
   <button class="toggle-theme" onclick="toggleTheme()">🌓 Toggle Theme</button>
 
   <div class="container">
-    <h1>🧬 MR-CoPe Report</h1>
+    <h1>🧬 MR-CoPe Results Report</h1>
     <p><strong>Date:</strong> <span id="today"></span></p>
 
     <div class="dashboard">
-      <div class="card"><h3>🧬 Instruments</h3><p>128 SNPs</p></div>
-      <div class="card"><h3>✅ Passed QC</h3><p>114 SNPs</p></div>
-      <div class="card"><h3>📈 IVW OR</h3><p>1.23 [1.05–1.44]</p></div>
-      <div class="card"><h3>📉 P-value</h3><p>0.0032</p></div>
+      <div class="card"><h3>🧬 Instruments</h3><p><!-- SNP_COUNT --></p></div>
+      <div class="card"><h3>✅ Passed QC</h3><p><!-- QC_COUNT --></p></div>
+      <div class="card"><h3>📈 IVW OR</h3><p><!-- IVW_OR --></p></div>
+      <div class="card"><h3>📉 P-value</h3><p><!-- IVW_P --></p></div>
     </div>
 
     <div class="section">
@@ -168,10 +166,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr><td>rs101</td><td>0.21</td><td>1e-5</td><td>0.12</td><td>0.003</td></tr>
-          <tr><td>rs102</td><td>-0.15</td><td>0.001</td><td>-0.08</td><td>0.02</td></tr>
-          <tr><td>rs103</td><td>0.05</td><td>0.12</td><td>0.03</td><td>0.07</td></tr>
-          <tr><td>rs104</td><td>0.3</td><td>3e-8</td><td>0.18</td><td>0.0001</td></tr>
+          <!-- SNP_TABLE_ROWS -->
         </tbody>
       </table>
     </div>
@@ -199,15 +194,13 @@
           </tr>
         </thead>
         <tbody>
-          <tr><td>IVW</td><td>0.15</td><td>0.002</td><td>0.05</td><td>0.25</td></tr>
-          <tr><td>MR-Egger</td><td>0.12</td><td>0.03</td><td>0.01</td><td>0.23</td></tr>
-          <tr><td>Weighted Median</td><td>0.14</td><td>0.01</td><td>0.04</td><td>0.24</td></tr>
+          <!-- METHOD_TABLE_ROWS -->
         </tbody>
       </table>
     </div>
 
     <div class="footer">
-      MR-CoPe Pipeline · Bioinformatics Suite · v1.0 · <a href="mailto:mrcope@openepi.org" style="color:inherit;">Contact Us</a>
+      MR-CoPe Pipeline · Open Source · v1.0 · <a href="mailto:mrcope@openepi.org" style="color:inherit;">Contact Us</a>
     </div>
   </div>
 
@@ -220,37 +213,13 @@
     });
 
     function toggleTheme() {
-      const html = document.documentElement;
-      const current = html.getAttribute("data-theme");
-      html.setAttribute("data-theme", current === "light" ? "dark" : "light");
+      const root = document.documentElement;
+      const current = root.getAttribute("data-theme");
+      root.setAttribute("data-theme", current === "light" ? "dark" : "light");
     }
 
-    Plotly.newPlot('scatter', [{
-      x: [0.21, -0.15, 0.05, 0.3],
-      y: [0.12, -0.08, 0.03, 0.18],
-      mode: 'markers+text',
-      text: ['rs101', 'rs102', 'rs103', 'rs104'],
-      textposition: 'top center',
-      type: 'scatter',
-      marker: { size: 10, color: '#007aff' }
-    }], {
-      title: 'Exposure vs Outcome Effects',
-      xaxis: { title: 'Beta (Exposure)' },
-      yaxis: { title: 'Beta (Outcome)' }
-    });
-
-    Plotly.newPlot('forest', [{
-      x: [0.21, -0.15, 0.05, 0.3],
-      y: ['rs101', 'rs102', 'rs103', 'rs104'],
-      error_x: { type: 'data', array: [0.05, 0.04, 0.03, 0.05], visible: true },
-      type: 'bar',
-      orientation: 'h',
-      marker: { color: '#2ca02c' }
-    }], {
-      title: 'SNP Effect Sizes with CI',
-      xaxis: { title: 'Beta Estimate' },
-      yaxis: { autorange: 'reversed' }
-    });
+    Plotly.newPlot('scatter', <!-- SCATTER_JSON -->);
+    Plotly.newPlot('forest', <!-- FOREST_JSON -->);
   </script>
 </body>
 </html>
