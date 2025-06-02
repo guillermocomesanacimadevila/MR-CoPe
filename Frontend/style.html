@@ -5,16 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>MR-CoPe Report</title>
 
-  <!-- Google Fonts -->
+  <!-- Fonts & Libraries -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
-
-  <!-- DataTables -->
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.5/css/jquery.dataTables.min.css"/>
-
-  <!-- Plotly -->
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-
-  <!-- jQuery + DataTables -->
   <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.5/js/jquery.dataTables.min.js"></script>
 
@@ -22,16 +16,18 @@
     :root {
       --bg-light: #f9fafb;
       --bg-dark: #1c1e21;
-      --text-light: #111;
-      --text-dark: #eee;
-      --card-bg-light: #fff;
-      --card-bg-dark: #2a2c2f;
+      --text-light: #1a1a1a;
+      --text-dark: #e0e0e0;
+      --card-light: #ffffff;
+      --card-dark: #2a2c2f;
       --accent: #007aff;
+      --shadow: rgba(0, 0, 0, 0.05);
     }
 
-    [data-theme="dark"] {
-      background-color: var(--bg-dark);
-      color: var(--text-dark);
+    [data-theme='dark'] {
+      --bg-light: var(--bg-dark);
+      --text-light: var(--text-dark);
+      --card-light: var(--card-dark);
     }
 
     * {
@@ -40,110 +36,116 @@
 
     body {
       font-family: 'Inter', sans-serif;
-      background: var(--bg-light);
+      background-color: var(--bg-light);
       color: var(--text-light);
       margin: 0;
       padding: 2rem;
-      transition: background 0.3s, color 0.3s;
-    }
-
-    [data-theme="dark"] body {
-      background: var(--bg-dark);
-      color: var(--text-dark);
+      transition: background 0.4s ease, color 0.4s ease;
     }
 
     .container {
-      max-width: 1100px;
+      max-width: 1200px;
       margin: auto;
     }
 
     h1 {
-      font-size: 2rem;
+      font-size: 2.2rem;
+      margin-bottom: 0.5rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    h2 {
+      font-size: 1.4rem;
+      margin-top: 2rem;
       margin-bottom: 1rem;
+      border-bottom: 2px solid var(--accent);
+      padding-bottom: 0.3rem;
     }
 
     .dashboard {
       display: flex;
+      flex-wrap: wrap;
       gap: 1rem;
       margin: 2rem 0;
-      flex-wrap: wrap;
     }
 
     .card {
-      background: var(--card-bg-light);
+      background: var(--card-light);
+      border-radius: 12px;
       padding: 1.5rem;
-      border-radius: 14px;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.05);
       flex: 1 1 200px;
-      transition: background 0.3s;
-    }
-
-    [data-theme="dark"] .card {
-      background: var(--card-bg-dark);
+      box-shadow: 0 2px 10px var(--shadow);
+      transition: background 0.4s;
     }
 
     .card h3 {
-      font-size: 1rem;
       margin: 0 0 0.5rem;
+      font-size: 1rem;
       color: var(--accent);
     }
 
     .section {
-      margin-bottom: 3rem;
-      background: var(--card-bg-light);
+      background: var(--card-light);
       padding: 2rem;
       border-radius: 12px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.04);
-      transition: background 0.3s;
-    }
-
-    [data-theme="dark"] .section {
-      background: var(--card-bg-dark);
+      margin-bottom: 2.5rem;
+      box-shadow: 0 2px 12px var(--shadow);
+      transition: background 0.4s;
     }
 
     table.dataTable {
       width: 100%;
       font-size: 0.95rem;
-      background: transparent;
-    }
-
-    #scatter, #forest {
       margin-top: 1rem;
+      background-color: transparent;
     }
 
-    .footer {
-      text-align: center;
-      font-size: 0.85rem;
-      color: #888;
-      margin-top: 4rem;
+    table.dataTable thead th {
+      background-color: var(--bg-light);
+      border-bottom: 2px solid var(--accent);
+    }
+
+    table.dataTable tbody tr:hover {
+      background-color: rgba(0, 122, 255, 0.05);
     }
 
     .toggle-theme {
       position: fixed;
       top: 20px;
       right: 20px;
-      background: var(--card-bg-light);
-      border: none;
-      padding: 0.5rem 1rem;
+      background: var(--card-light);
+      border: 1px solid #ccc;
+      padding: 0.6rem 1rem;
       border-radius: 10px;
       font-weight: 600;
       cursor: pointer;
       box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      transition: background 0.3s;
+      transition: all 0.3s ease;
     }
 
-    [data-theme="dark"] .toggle-theme {
-      background: var(--card-bg-dark);
+    [data-theme='dark'] .toggle-theme {
       color: var(--text-dark);
+    }
+
+    .footer {
+      text-align: center;
+      font-size: 0.85rem;
+      opacity: 0.7;
+      margin-top: 4rem;
+    }
+
+    @media (max-width: 768px) {
+      body { padding: 1rem; }
+      .dashboard { flex-direction: column; }
     }
   </style>
 </head>
 <body>
-
   <button class="toggle-theme" onclick="toggleTheme()">🌓 Toggle Theme</button>
 
   <div class="container">
-    <h1>🧬 MR-CoPe Results Report</h1>
+    <h1>🧬 MR-CoPe Report</h1>
     <p><strong>Date:</strong> <span id="today"></span></p>
 
     <div class="dashboard">
@@ -205,28 +207,24 @@
     </div>
 
     <div class="footer">
-      MR-CoPe Pipeline · Open Source · v1.0 · <a href="mailto:mrcope@openepi.org" style="color:inherit;">Contact Us</a>
+      MR-CoPe Pipeline · Bioinformatics Suite · v1.0 · <a href="mailto:mrcope@openepi.org" style="color:inherit;">Contact Us</a>
     </div>
   </div>
 
   <script>
-    // Set date
     document.getElementById("today").textContent = new Date().toLocaleDateString();
 
-    // DataTables
     $(document).ready(function () {
       $('#snpTable').DataTable();
       $('#methodTable').DataTable();
     });
 
-    // Toggle dark mode
     function toggleTheme() {
-      const root = document.documentElement;
-      const current = root.getAttribute("data-theme");
-      root.setAttribute("data-theme", current === "light" ? "dark" : "light");
+      const html = document.documentElement;
+      const current = html.getAttribute("data-theme");
+      html.setAttribute("data-theme", current === "light" ? "dark" : "light");
     }
 
-    // Plotly Scatter
     Plotly.newPlot('scatter', [{
       x: [0.21, -0.15, 0.05, 0.3],
       y: [0.12, -0.08, 0.03, 0.18],
@@ -241,7 +239,6 @@
       yaxis: { title: 'Beta (Outcome)' }
     });
 
-    // Plotly Forest
     Plotly.newPlot('forest', [{
       x: [0.21, -0.15, 0.05, 0.3],
       y: ['rs101', 'rs102', 'rs103', 'rs104'],
