@@ -20,6 +20,8 @@ workflow {
     def script_mr          = file("${params.script_dir}/04_mr_analyses.R")
     def script_vis_sum     = file("${params.script_dir}/05_visualisations.py")
     def script_vis_scatt   = file("${params.script_dir}/06_visualisations.R")
+    def script_html_report = file("${params.script_dir}/07_generate_html_report.py")
+    def html_template      = file("Frontend/style.html")
 
     def exposure_file = file(params.exposure)
     def outcome_file  = file(params.outcome)
@@ -44,6 +46,9 @@ workflow {
 
     // Step 6b: MR scatter plots + leave-one-out
     visualisation_scatter(script_vis_scatt, mr_analysis.out.harmonised)
+
+    // Step 7: Generate interactive HTML report
+    html_report(script_html_report, mr_analysis.out.summary, mr_analysis.out.snps, html_template)
 }
 
 // ========================== PROCESSES ==========================
@@ -170,5 +175,23 @@ process visualisation_scatter {
     script:
     """
     Rscript ${script} ${harmonised} ${params.output_dir}
+    """
+}
+
+process html_report {
+    publishDir "${params.output_dir}", mode: 'copy', overwrite: true
+
+    input:
+    path script
+    path summary
+    path snps
+    path html_template
+
+    output:
+    path("MR_CoPe_Report.html")
+
+    script:
+    """
+    python3 ${script} ${summary} ${snps} ${html_template} MR_CoPe_Report.html
     """
 }
