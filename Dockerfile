@@ -29,7 +29,8 @@ RUN mkdir -p ${R_LIBS_USER} && chmod -R 777 ${R_LIBS_USER}
 # Install Python dependencies
 # -----------------------------
 RUN pip install --upgrade pip && pip install \
-    pandas numpy matplotlib seaborn scipy
+    pandas numpy matplotlib seaborn scipy \
+    plotly jinja2
 
 # -----------------------------
 # Install base R packages from CRAN
