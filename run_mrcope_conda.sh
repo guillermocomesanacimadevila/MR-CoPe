@@ -5,10 +5,6 @@
 ###############################################################################
 # Usage:
 #   chmod +x run_mrcope_conda.sh && ./run_mrcope_conda.sh
-#
-# Description:
-#   This script launches the MR-CoPe pipeline using Conda and Nextflow.
-#   It sets up the required environment, installs dependencies, and runs the workflow.
 ###############################################################################
 
 set -e
@@ -56,11 +52,23 @@ if ! command -v conda &> /dev/null; then
   exit 1
 fi
 
-if ! conda info --envs | grep -q "^$ENV_NAME"; then
+ENV_EXISTS=$(conda info --envs | awk '{print $1}' | grep -Fx "$ENV_NAME" || true)
+if [[ -n "$ENV_EXISTS" ]]; then
+  echo -e "${YEL}⚠️  Conda environment '$ENV_NAME' already exists.${NC}"
+  read -rp "❓ Do you want to DELETE and REBUILD the environment? [y/N]: " REBUILD_ENV
+  REBUILD_ENV=$(echo "$REBUILD_ENV" | tr '[:upper:]' '[:lower:]')
+  if [[ "$REBUILD_ENV" == "y" ]]; then
+    echo -e "${YEL}🧹 Removing existing Conda environment '$ENV_NAME'...${NC}"
+    conda deactivate || true
+    conda env remove -n $ENV_NAME -y
+    echo -e "${GRN}📦 Creating new Conda environment '$ENV_NAME'...${NC}"
+    conda create -y -n $ENV_NAME python=$PYTHON_VERSION r-base=$R_VERSION r-essentials r-devtools
+  else
+    echo -e "${GRN}✅ Using existing Conda environment '$ENV_NAME'.${NC}"
+  fi
+else
   echo -e "${GRN}📦 Creating new Conda environment '$ENV_NAME'...${NC}"
   conda create -y -n $ENV_NAME python=$PYTHON_VERSION r-base=$R_VERSION r-essentials r-devtools
-else
-  echo -e "${GRN}✅ Using existing Conda environment '$ENV_NAME'.${NC}"
 fi
 
 eval "$(conda shell.bash hook)"
