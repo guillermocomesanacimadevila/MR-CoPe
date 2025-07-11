@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 ###############################################################################
 #                        MR-CoPe Pipeline Runner (Docker Version)             #
@@ -8,22 +8,132 @@
 #
 # Description:
 #   This script launches the MR-CoPe pipeline using Docker and Nextflow.
-#   It prompts the user for GWAS input files and executes the full workflow.
+#   It checks if Docker is running and starts it if needed.
+#   It also checks/loads or installs Nextflow before running the main workflow.
 ###############################################################################
 
 set -e  # Exit on any error
 
+# --- Color Output (Professional Touch) ---
+RED='\033[0;31m'
+GRN='\033[0;32m'
+YEL='\033[1;33m'
+NC='\033[0m' # No Color
+
+# --- Trap to handle exit, Ctrl+C, cleanup, etc ---
+cleanup() {
+  echo -e "\n${RED}🛑 Pipeline interrupted or failed. Exiting...${NC}"
+  exit 1
+}
+trap cleanup INT TERM
+
 echo ""
-echo "🧬 Welcome to MR-CoPe: Mendelian Randomisation Pipeline"
+echo -e "${GRN}🧬 Welcome to MR-CoPe: Mendelian Randomisation Pipeline${NC}"
 echo "--------------------------------------------------------"
 
-# ------------------------ Input Type Selection ------------------------
+# --- Detect and enforce running from script dir (avoids path confusion) ---
+MYDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ "$PWD" != "$MYDIR" ]]; then
+  echo -e "${YEL}⚠️  Please run this script from its own directory: $MYDIR${NC}"
+  exit 1
+fi
 
+# --- Version info (from VERSION file or git) ---
+if [[ -f VERSION ]]; then
+  VERSION=$(cat VERSION)
+elif git rev-parse --short HEAD 2>/dev/null; then
+  VERSION=$(git rev-parse --short HEAD)
+else
+  VERSION="(unknown)"
+fi
+echo -e "${GRN}MR-CoPe Version: $VERSION${NC}"
+
+# --- Docker Daemon Check/Start (cross-platform) ---
+docker_is_running() {
+  docker info >/dev/null 2>&1
+}
+
+try_start_docker() {
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS: open Docker Desktop
+    echo "🐳 Attempting to open Docker Desktop on macOS..."
+    open -a Docker || {
+      echo -e "${RED}❌ Could not launch Docker Desktop. Please start Docker manually and rerun.${NC}"
+      exit 1
+    }
+    echo "⏳ Waiting for Docker Desktop to launch (this may take ~30s)..."
+    while ! docker_is_running; do sleep 2; done
+  elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    # Linux: try to start docker daemon (needs sudo)
+    echo "🐳 Attempting to start Docker service on Linux..."
+    sudo systemctl start docker || {
+      echo -e "${RED}❌ Could not start Docker service. Please start Docker manually and rerun.${NC}"
+      exit 1
+    }
+    echo "⏳ Waiting for Docker daemon to be ready..."
+    while ! docker_is_running; do sleep 2; done
+  else
+    echo -e "${YEL}❓ Unrecognized OS. Please ensure Docker is running, then rerun.${NC}"
+    exit 1
+  fi
+}
+
+echo "🔍 Checking for Docker..."
+if ! command -v docker &> /dev/null; then
+  echo -e "${RED}❌ Docker is not installed. Please install Docker and rerun.${NC}"
+  exit 1
+fi
+
+if ! docker_is_running; then
+  echo -e "${YEL}⚠️  Docker daemon does not appear to be running.${NC}"
+  try_start_docker
+fi
+echo -e "${GRN}✅ Docker is running.${NC}"
+
+# --- Nextflow Check/Install ---
+echo "🔍 Checking for Nextflow..."
+
+NF_CMD=nextflow
+if ! command -v nextflow &> /dev/null; then
+  # Try to load via modules (HPC etc)
+  if command -v module &>/dev/null; then
+    echo "💡 Loading Nextflow via 'module load nextflow'..."
+    module load nextflow || true
+  fi
+fi
+
+if ! command -v nextflow &> /dev/null; then
+  # Try local nextflow if present from previous install
+  if [[ -f "$MYDIR/nextflow" ]]; then
+    chmod +x "$MYDIR/nextflow"
+    export PATH="$MYDIR:$PATH"
+    NF_CMD="$MYDIR/nextflow"
+  else
+    echo -e "${YEL}⚠️  Nextflow not found, attempting local installation...${NC}"
+    curl -fsSL https://get.nextflow.io | bash
+    mv nextflow "$MYDIR/"
+    chmod +x "$MYDIR/nextflow"
+    export PATH="$MYDIR:$PATH"
+    NF_CMD="$MYDIR/nextflow"
+  fi
+fi
+
+if ! command -v nextflow &> /dev/null; then
+  echo -e "${RED}❌ Nextflow installation failed. Please install manually from https://www.nextflow.io/.${NC}"
+  exit 1
+fi
+
+echo -e "${GRN}✅ Nextflow is available.${NC}"
+
+# --- Create Results Directory If Needed ---
+mkdir -p ./results
+
+# ------------------------ Input Type Selection ------------------------
 read -rp "🧬 Do you have VCF files or CSV/TSV summary stats? [vcf/csv]: " INPUT_TYPE
 INPUT_TYPE=$(echo "$INPUT_TYPE" | tr '[:upper:]' '[:lower:]')
 
 if [[ "$INPUT_TYPE" != "vcf" && "$INPUT_TYPE" != "csv" ]]; then
-  echo "❌ ERROR: Unknown input format '$INPUT_TYPE'. Please enter 'vcf' or 'csv'."
+  echo -e "${RED}❌ ERROR: Unknown input format '$INPUT_TYPE'. Please enter 'vcf' or 'csv'.${NC}"
   exit 1
 fi
 
@@ -35,7 +145,7 @@ if [[ "$INPUT_TYPE" == "vcf" ]]; then
 
   for file in "$EXPOSURE_VCF" "$OUTCOME_VCF"; do
     if [[ ! -f "$file" ]]; then
-      echo "❌ ERROR: File not found: $file"
+      echo -e "${RED}❌ ERROR: File not found: $file${NC}"
       exit 1
     fi
   done
@@ -45,7 +155,7 @@ if [[ "$INPUT_TYPE" == "vcf" ]]; then
 
   echo "🔄 Parsing VCF: $EXPOSURE_VCF → ./tmp_exposure.csv"
   python3 - <<EOF
-import gzip, csv, sys
+import gzip, csv
 
 vcf_path = "$EXPOSURE_VCF"
 csv_path = "./tmp_exposure.csv"
@@ -105,7 +215,7 @@ EOF
 
   echo "🔄 Parsing VCF: $OUTCOME_VCF → ./tmp_outcome.csv"
   python3 - <<EOF
-import gzip, csv, sys
+import gzip, csv
 
 vcf_path = "$OUTCOME_VCF"
 csv_path = "./tmp_outcome.csv"
@@ -173,7 +283,7 @@ else
 
   for file in "$EXPOSURE_PATH" "$OUTCOME_PATH"; do
     if [[ ! -f "$file" ]]; then
-      echo "❌ ERROR: File not found: $file"
+      echo -e "${RED}❌ ERROR: File not found: $file${NC}"
       exit 1
     fi
   done
@@ -195,67 +305,61 @@ CLUMP_KB="${CLUMP_KB:-10000}"
 CLUMP_R2="${CLUMP_R2:-0.001}"
 
 if ! [[ "$CLUMP_KB" =~ ^[0-9]+$ ]]; then
-  echo "❌ Invalid clump_kb value. Must be an integer."
+  echo -e "${RED}❌ Invalid clump_kb value. Must be an integer.${NC}"
   exit 1
 fi
 if ! awk "BEGIN {exit !($CLUMP_R2 > 0 && $CLUMP_R2 <= 1)}"; then
-  echo "❌ Invalid clump_r2 value. Must be a number > 0 and ≤ 1 (e.g., 0.01, 1.0)."
+  echo -e "${RED}❌ Invalid clump_r2 value. Must be a number > 0 and ≤ 1 (e.g., 0.01, 1.0).${NC}"
   exit 1
 fi
+
+# -------------------- Print Summary Table Before Run -----------------------
 
 echo ""
-echo "📁 Exposure file : $EXPOSURE_PATH"
-echo "📁 Outcome file  : $OUTCOME_PATH"
-echo "📏 LD window (kb): $CLUMP_KB"
-echo "🔗 LD r² cutoff  : $CLUMP_R2"
+echo -e "${GRN}🔎 Pipeline launch summary:${NC}"
+printf "  %-22s %s\n" "Exposure file:" "$EXPOSURE_PATH"
+printf "  %-22s %s\n" "Outcome file:" "$OUTCOME_PATH"
+printf "  %-22s %s\n" "LD window (kb):" "$CLUMP_KB"
+printf "  %-22s %s\n" "LD r² cutoff:" "$CLUMP_R2"
+printf "  %-22s %s\n" "Output dir:" "./results"
+printf "  %-22s %s\n" "MR-CoPe version:" "$VERSION"
 echo "--------------------------------------------------------"
 
-# ------------------------ Dependency Checks ------------------------
-
-echo "🔍 Checking for Docker..."
-if ! command -v docker &> /dev/null; then
-  echo "❌ Docker is not installed. Please install it from https://www.docker.com and rerun this script."
-  exit 1
-fi
-echo "✅ Docker is installed."
-
-echo "🔍 Checking for Nextflow..."
-if ! command -v nextflow &> /dev/null; then
-  echo "❌ Nextflow is not installed. Please install it from https://www.nextflow.io and rerun this script."
-  exit 1
-fi
-echo "✅ Nextflow is installed."
-
-# ------------------------ Docker Image Check ------------------------
+# -------------------- Docker Image Check --------------------------
 
 IMAGE_NAME="mrcope:latest"
 if ! docker image inspect "$IMAGE_NAME" > /dev/null 2>&1; then
   echo ""
-  echo "🐳 Docker image '$IMAGE_NAME' not found locally."
+  echo -e "${YEL}🐳 Docker image '$IMAGE_NAME' not found locally.${NC}"
   read -rp "🔧 Build image from Dockerfile now? [y/N]: " BUILD_CHOICE
   if [[ "$BUILD_CHOICE" =~ ^[Yy]$ ]]; then
     docker build -t "$IMAGE_NAME" .
-    echo "✅ Docker image '$IMAGE_NAME' built successfully."
+    echo -e "${GRN}✅ Docker image '$IMAGE_NAME' built successfully.${NC}"
   else
-    echo "❌ Cannot continue without Docker image '$IMAGE_NAME'. Exiting."
+    echo -e "${RED}❌ Cannot continue without Docker image '$IMAGE_NAME'. Exiting.${NC}"
     exit 1
   fi
 fi
 
+# --------- Save command to logfile for reproducibility --------------
+CMD="$NF_CMD run main.nf -with-docker \"$IMAGE_NAME\" \
+    --exposure \"$EXPOSURE_PATH\" \
+    --outcome \"$OUTCOME_PATH\" \
+    --log10_flag \"$LOG10_FLAG\" \
+    --clump_kb \"$CLUMP_KB\" \
+    --clump_r2 \"$CLUMP_R2\" \
+    --output_dir \"./results\" \
+    -resume"
+echo "$CMD" > ./results/mrcope_command.log
+
 # ------------------------ Run Pipeline ------------------------
 
 echo ""
-echo "🚀 Launching MR-CoPe Pipeline with Docker..."
-nextflow run main.nf -with-docker "$IMAGE_NAME" \
-    --exposure "$EXPOSURE_PATH" \
-    --outcome "$OUTCOME_PATH" \
-    --log10_flag "$LOG10_FLAG" \
-    --clump_kb "$CLUMP_KB" \
-    --clump_r2 "$CLUMP_R2" \
-    --output_dir "./results" \
-    -resume
+echo -e "${GRN}🚀 Launching MR-CoPe Pipeline with Docker...${NC}"
+eval $CMD
 
 echo ""
-echo "🎉 MR-CoPe Pipeline completed successfully!"
-echo "📦 Results are available in: ./results/"
+echo -e "${GRN}🎉 MR-CoPe Pipeline completed successfully!${NC}"
+echo -e "📦 Results are available in: ${YEL}./results/${NC}"
+echo -e "🔍 Review the HTML report or output files for your MR results."
 echo "--------------------------------------------------------"
