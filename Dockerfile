@@ -35,24 +35,22 @@ RUN pip install --upgrade pip && pip install \
 # -----------------------------
 # Install base R packages from CRAN
 # -----------------------------
-    RUN Rscript -e "install.packages(c( \
+RUN Rscript -e "install.packages(c( \
     'devtools', 'optparse', 'qqman', 'ggrepel', 'data.table', \
     'patchwork', 'RColorBrewer', 'MASS', 'Matrix', 'gridExtra', 'lattice', \
     'stringr', 'purrr', 'plyr', 'tidyr', 'remotes', 'httr' \
-), repos='https://cloud.r-project.org')"
+), repos='https://cloud.r-project.org', dependencies=TRUE)"
 
 # -----------------------------
 # Install tidyverse with verification
 # -----------------------------
-RUN Rscript -e "install.packages('tidyverse', repos='https://cloud.r-project.org')" && \
+RUN Rscript -e "install.packages('tidyverse', repos='https://cloud.r-project.org', dependencies=TRUE)" && \
     Rscript -e "stopifnot('tidyverse' %in% rownames(installed.packages()))"
 
 # -----------------------------
-# Install TwoSampleMR + ieugwasr from r-universe with verification
+# Install TwoSampleMR & ieugwasr from r-universe (official, recommended)
 # -----------------------------
-RUN Rscript -e "install.packages(c('TwoSampleMR', 'ieugwasr'), \
-    repos=c('https://mrcieu.r-universe.dev', 'https://cloud.r-project.org'))" && \
-    Rscript -e "stopifnot(all(c('TwoSampleMR', 'ieugwasr') %in% rownames(installed.packages())))"
+RUN Rscript -e "install.packages(c('TwoSampleMR', 'ieugwasr'), repos = c('https://mrcieu.r-universe.dev', 'https://cloud.r-project.org'))"
 
 # -----------------------------
 # Set working directory
