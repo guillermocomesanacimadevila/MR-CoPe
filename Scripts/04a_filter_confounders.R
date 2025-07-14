@@ -13,7 +13,7 @@
 # Example:
 #   Rscript 04a_filter_confounders.R ld_pruned_SNPs.csv filtered_SNPs.csv "LDL|cholesterol"
 #
-# Author: MR-CoPe Team
+# Author: MR-CoPe Team (updated July 2025)
 # =============================================================================
 
 suppressPackageStartupMessages({
@@ -45,14 +45,32 @@ if (!file.exists(input_file)) {
 cat("📥 Loading:", input_file, "\n")
 gwas <- read_csv(input_file, show_col_types = FALSE)
 
+# Robustly ensure 'SNP' column exists
 if (!"SNP" %in% colnames(gwas)) {
-  cat("❌ ERROR: Input file must contain a 'SNP' column.\n")
-  quit(status = 1)
+  if ("rsid" %in% colnames(gwas)) {
+    cat("🛠️  Renaming 'rsid' to 'SNP'...\n")
+    gwas <- gwas %>% rename(SNP = rsid)
+  } else {
+    cat("❌ ERROR: Input file must contain a 'SNP' (or 'rsid') column.\n")
+    quit(status = 1)
+  }
+}
+
+if (nrow(gwas) == 0) {
+  cat("⚠️  Input file has 0 rows. Writing empty output and exiting.\n")
+  file.create(output_file)
+  quit(status = 0)
 }
 
 snps <- unique(gwas$SNP)
 cat("🔬 SNPs to evaluate:", length(snps), "\n")
 cat("🎯 Target trait pattern:", target_keyword, "\n\n")
+
+if (length(snps) == 0) {
+  cat("⚠️  No SNPs to query. Writing empty output and exiting.\n")
+  file.create(output_file)
+  quit(status = 0)
+}
 
 # -----------------------
 # Query PhenoScanner API
@@ -102,6 +120,14 @@ for (i in seq_along(snps)) {
 # Save filtered results
 # -----------------------
 gwas_filtered <- gwas %>% filter(!SNP %in% snps_to_remove)
+
+# Ensure the output file always has a 'SNP' column
+if (!"SNP" %in% colnames(gwas_filtered)) {
+  if ("rsid" %in% colnames(gwas_filtered)) {
+    gwas_filtered <- gwas_filtered %>% rename(SNP = rsid)
+  }
+}
+
 write_csv(gwas_filtered, output_file)
 
 cat("\n🧹 SNPs removed:", length(snps_to_remove), "\n")
