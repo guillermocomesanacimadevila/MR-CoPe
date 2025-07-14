@@ -3,17 +3,17 @@
 # ===================================================================
 # MR-CoPe | Linkage Disequilibrium Pruning (Real LD Clumping)
 # ===================================================================
-# Authors: Guillermo Comesaña & Christian Pepler
+# Authors: Guillermo Comesaña & Christian Pepler, Updated by ChatGPT
 #
 # Description:
 # Performs LD pruning using real linkage disequilibrium structure via
-# the TwoSampleMR::ld_clump() function, using the 1000 Genomes EUR panel.
+# the TwoSampleMR::clump_data() function, using the 1000 Genomes EUR panel.
 #
 # Usage:
 #   Rscript 03_linkage_disequillibrium.R <input_filtered_SNPs.csv> <output_ld_pruned.csv> <clump_kb> <clump_r2>
 #
 # Notes:
-# - Requires 'SNP' and 'PVALUE_exp' columns in the input file
+# - Requires 'SNP' and 'PVALUE_exp' columns in the input file (or 'rsid', which will be renamed).
 # ===================================================================
 
 suppressPackageStartupMessages({
@@ -48,13 +48,28 @@ if (!file.exists(input_file)) {
 cat("📥 Reading input from:\n  →", input_file, "\n")
 gwas <- read_csv(input_file, show_col_types = FALSE)
 
-cat("📊 SNPs loaded:", nrow(gwas), "\n\n")
-
-# ------------------ Check Required Columns ------------------
-
-if (!"SNP" %in% names(gwas) || !"PVALUE_exp" %in% names(gwas)) {
-  stop("❌ Input must contain columns: 'SNP' and 'PVALUE_exp'.")
+# Handle empty input
+if (nrow(gwas) == 0) {
+  cat("⚠️  WARNING: Input file is empty. Writing empty output and exiting.\n")
+  file.create(output_file)
+  quit(status = 0)
 }
+
+# Robust column naming for SNPs
+if (!"SNP" %in% names(gwas)) {
+  if ("rsid" %in% names(gwas)) {
+    cat("🛠️  Renaming 'rsid' to 'SNP'...\n")
+    gwas <- gwas %>% rename(SNP = rsid)
+  } else {
+    stop("❌ Input must contain a 'SNP' (or 'rsid') column.")
+  }
+}
+
+if (!"PVALUE_exp" %in% names(gwas)) {
+  stop("❌ Input must contain column: 'PVALUE_exp'.")
+}
+
+cat("📊 SNPs loaded:", nrow(gwas), "\n\n")
 
 # ------------------ Build clump_input ------------------
 
@@ -66,14 +81,14 @@ if (!has_chr_pos) {
 
 clump_input <- gwas %>%
   transmute(
-    rsid = SNP,
-    pval = PVALUE_exp,
-    id   = "exposure",
+    SNP  = SNP,
     chr  = if (has_chr_pos) CHR_exp else NA,
-    pos  = if (has_chr_pos) BP_exp else NA
+    pos  = if (has_chr_pos) BP_exp else NA,
+    pval = PVALUE_exp,
+    id   = "exposure"
   )
 
-cat("🧪 Sample SNPs going into ld_clump():\n")
+cat("🧪 Sample SNPs going into clump_data():\n")
 print(head(clump_input))
 
 # ------------------ Run LD Clumping ------------------
@@ -84,9 +99,17 @@ cat("   ➤ R²     :", clump_r2, "\n")
 cat("   ➤ P      : 1.0 (keep all SNPs)\n\n")
 
 clumped <- tryCatch({
-  ld_clump(clump_input, clump_kb = clump_kb, clump_r2 = clump_r2, clump_p = 1.0)
+  clump_data(
+    dat      = clump_input,
+    clump_kb = clump_kb,
+    clump_r2 = clump_r2,
+    clump_p1 = 1.0,
+    clump_p2 = 1.0,
+    pop      = "EUR"
+  )
 }, error = function(e) {
   cat("❌ Clumping failed:\n", e$message, "\n")
+  file.create(output_file)
   quit(status = 1)
 })
 
@@ -99,7 +122,17 @@ if (nrow(clumped) == 0) {
   quit(status = 0)
 }
 
-gwas_pruned <- gwas %>% filter(SNP %in% clumped$rsid)
+gwas_pruned <- gwas %>% filter(SNP %in% clumped$SNP)
+
+# =========== ENSURE COLUMN IS CALLED 'SNP' ==========
+if (!"SNP" %in% colnames(gwas_pruned)) {
+  if ("rsid" %in% colnames(gwas_pruned)) {
+    gwas_pruned <- gwas_pruned %>% rename(SNP = rsid)
+  } else {
+    stop("❌ ERROR: Output file must contain a 'SNP' column (even after clumping)!")
+  }
+}
+# =========== END FIX ==========
 
 cat("✅ SNPs after clumping:", nrow(gwas_pruned), "\n")
 cat("🚫 SNPs removed due to LD:", nrow(gwas) - nrow(gwas_pruned), "\n")
