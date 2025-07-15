@@ -40,6 +40,9 @@ Follow the steps below to set up and run the MR-CoPe pipeline.
 
 ```bash
 git clone https://github.com/guillermocomesanacimadevila/MR-CoPe.git
+```
+
+```bash
 cd MR-CoPe
 ```
 
