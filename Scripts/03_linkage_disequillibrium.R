@@ -7,10 +7,10 @@
 #
 # Description:
 # Performs LD pruning using real linkage disequilibrium structure via
-# the TwoSampleMR::clump_data() function, using the 1000 Genomes EUR panel.
+# the TwoSampleMR::clump_data() function, using the user-supplied 1000 Genomes pop panel.
 #
 # Usage:
-#   Rscript 03_linkage_disequillibrium.R <input_filtered_SNPs.csv> <output_ld_pruned.csv> <clump_kb> <clump_r2>
+#   Rscript 03_linkage_disequillibrium.R <input_filtered_SNPs.csv> <output_ld_pruned.csv> <clump_kb> <clump_r2> <ld_pop>
 #
 # Notes:
 # - Requires 'SNP' and 'PVALUE_exp' columns in the input file (or 'rsid', which will be renamed).
@@ -24,9 +24,9 @@ suppressPackageStartupMessages({
 
 args <- commandArgs(trailingOnly = TRUE)
 
-if (length(args) != 4) {
+if (length(args) != 5) {
   cat("\n❌ ERROR: Incorrect number of arguments.\n")
-  cat("Usage: Rscript 03_linkage_disequillibrium.R <input> <output> <clump_kb> <clump_r2>\n\n")
+  cat("Usage: Rscript 03_linkage_disequillibrium.R <input> <output> <clump_kb> <clump_r2> <ld_pop>\n\n")
   quit(status = 1)
 }
 
@@ -34,6 +34,7 @@ input_file  <- args[1]
 output_file <- args[2]
 clump_kb    <- as.numeric(args[3])
 clump_r2    <- as.numeric(args[4])
+ld_pop      <- args[5]
 
 cat("\n==============================================================\n")
 cat("MR-CoPe | Linkage Disequilibrium Pruning\n")
@@ -96,6 +97,7 @@ print(head(clump_input))
 cat("🔗 Clumping with:\n")
 cat("   ➤ Window :", clump_kb, "kb\n")
 cat("   ➤ R²     :", clump_r2, "\n")
+cat("   ➤ Pop    :", ld_pop, "\n")
 cat("   ➤ P      : 1.0 (keep all SNPs)\n\n")
 
 clumped <- tryCatch({
@@ -105,7 +107,7 @@ clumped <- tryCatch({
     clump_r2 = clump_r2,
     clump_p1 = 1.0,
     clump_p2 = 1.0,
-    pop      = "EUR"
+    pop      = ld_pop
   )
 }, error = function(e) {
   cat("❌ Clumping failed:\n", e$message, "\n")
