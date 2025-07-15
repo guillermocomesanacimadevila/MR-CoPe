@@ -4,18 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>MR-CoPe | Mendelian Randomisation Dashboard</title>
-
-  <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet"/>
-
-  <!-- DataTables -->
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.5/css/jquery.dataTables.min.css"/>
   <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.dataTables.min.css"/>
-
-  <!-- Plotly -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/scroller/2.2.0/css/scroller.dataTables.min.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
   <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
-
-  <!-- jQuery + DataTables + Extensions -->
   <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.5/js/jquery.dataTables.min.js"></script>
   <script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
@@ -23,36 +17,33 @@
   <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.print.min.js"></script>
   <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.colVis.min.js"></script>
   <script src="https://cdn.datatables.net/scroller/2.2.0/js/dataTables.scroller.min.js"></script>
-  <link rel="stylesheet" href="https://cdn.datatables.net/scroller/2.2.0/css/scroller.dataTables.min.css"/>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
-
   <style>
     :root {
-      --bg: #f7f9fb;
+      --bg: #f6f8fa;
       --card-bg: #fff;
-      --accent: #007aff;
+      --accent: #356cf2;
       --danger: #e74c3c;
-      --table-head: #1a1f27;
-      --text: #222;
-      --shadow: 0 4px 28px rgba(0,0,0,0.09);
-      --border: #e6ecf2;
-      --border-radius: 18px;
+      --table-head: #21232c;
+      --text: #21232c;
+      --shadow: 0 4px 30px rgba(56,78,138,0.09);
+      --border: #e1e6ee;
+      --border-radius: 22px;
       --font-main: 'Inter', Arial, sans-serif;
-      --font-mono: 'JetBrains Mono', 'Fira Mono', 'Menlo', monospace;
       --success: #38c172;
+      --table-bg: #f1f5f9;
     }
     [data-theme="dark"] {
-      --bg: #181a1b;
-      --card-bg: #23262a;
-      --accent: #0095ff;
+      --bg: #1b2028;
+      --card-bg: #23262f;
+      --accent: #3ecfff;
       --danger: #f35d5d;
-      --table-head: #eaeaea;
-      --text: #f7f7f7;
-      --shadow: 0 2px 16px rgba(0,0,0,0.35);
-      --border: #393e47;
+      --table-head: #f5f8fa;
+      --text: #eaeaf4;
+      --shadow: 0 4px 30px rgba(30,45,80,0.34);
+      --border: #383c4a;
       --success: #38d39f;
+      --table-bg: #1b2230;
     }
-
     html, body {
       background: var(--bg);
       color: var(--text);
@@ -60,15 +51,24 @@
       font-size: 17px;
       margin: 0;
       padding: 0;
-      transition: background .3s, color .3s;
       min-height: 100vh;
+      transition: background .3s, color .3s;
     }
     .container {
-      max-width: 1200px;
-      margin: 2.2rem auto 0;
-      padding: 0 2vw 4rem 2vw;
+      max-width: 1280px;
+      margin: 1.2rem auto 0;
+      padding: 0 1.5vw 4rem 1.5vw;
     }
-    h1, h2, h3 {
+    h1 {
+      font-size: 2.35rem;
+      letter-spacing: -0.02em;
+      font-weight: 800;
+      margin-top: 0;
+      margin-bottom: 0.2rem;
+      color: var(--accent);
+      line-height: 1.18;
+    }
+    h2 {
       font-weight: 800;
       letter-spacing: -0.03em;
       color: var(--table-head);
@@ -77,76 +77,95 @@
     .dashboard {
       display: flex;
       gap: 1.3rem;
-      margin: 2rem 0 2.5rem;
+      margin: 2.1rem 0 2.5rem;
       flex-wrap: wrap;
-      justify-content: space-between;
+      justify-content: stretch;
     }
     .card {
       background: var(--card-bg);
       box-shadow: var(--shadow);
       border-radius: var(--border-radius);
-      flex: 1 1 220px;
-      min-width: 200px;
-      max-width: 290px;
-      padding: 2.1rem 1.5rem 1.4rem;
-      position: relative;
-      transition: box-shadow .2s;
+      flex: 1 1 210px;
+      min-width: 180px;
+      max-width: 280px;
+      padding: 2.2rem 1.2rem 1.4rem;
+      text-align: center;
       margin-bottom: .8rem;
+      border: 1.5px solid var(--border);
+      position: relative;
+      overflow: hidden;
+    }
+    .card:before {
+      content: '';
+      position: absolute;
+      top: -100px; left: 0; right: 0;
+      height: 110px;
+      background: linear-gradient(90deg, var(--accent) 0%, transparent 100%);
+      opacity: 0.08;
+      z-index: 0;
     }
     .card h3 {
-      font-size: 1.1rem;
+      font-size: 1.08rem;
       color: var(--accent);
-      margin: 0 0 .3rem 0;
-      font-weight: 600;
+      margin: 0 0 .2rem 0;
+      font-weight: 700;
+      position: relative;
+      z-index: 1;
+      letter-spacing: 0.01em;
     }
     .card p {
-      font-size: 1.95rem;
+      font-size: 2.05rem;
       margin: 0;
       color: var(--table-head);
-      font-weight: 800;
+      font-weight: 900;
       letter-spacing: -0.01em;
+      position: relative;
+      z-index: 1;
     }
-
     .section {
       background: var(--card-bg);
       box-shadow: var(--shadow);
       border-radius: var(--border-radius);
-      padding: 2.7rem 2.2rem 2.2rem;
-      margin-bottom: 3.5rem;
-      margin-top: 1.8rem;
+      padding: 2.8rem 2.3rem 2.2rem;
+      margin-bottom: 3.2rem;
+      margin-top: 1.6rem;
+      border: 1.5px solid var(--border);
     }
     .tabbed {
-      margin-bottom: 3.5rem;
+      margin-bottom: 2.2rem;
     }
     .tab-buttons {
       display: flex;
-      border-bottom: 1.5px solid var(--border);
+      border-bottom: 2px solid var(--border);
       gap: 2px;
-      margin-bottom: 1rem;
+      margin-bottom: 1.3rem;
+      background: none;
     }
     .tab-btn {
       background: none;
       border: none;
-      font-size: 1.09rem;
+      font-size: 1.10rem;
       font-family: inherit;
-      font-weight: 700;
+      font-weight: 800;
       color: var(--accent);
-      padding: 0.7rem 2rem 0.6rem 1rem;
-      border-top-left-radius: 14px;
-      border-top-right-radius: 14px;
-      border-bottom: 2px solid transparent;
+      padding: 0.8rem 2.3rem 0.75rem 1.5rem;
+      border-top-left-radius: 15px;
+      border-top-right-radius: 15px;
+      border-bottom: 3px solid transparent;
       cursor: pointer;
-      transition: background .14s, border-bottom .17s;
-      outline: none;
       margin-right: .2rem;
+      transition: background .13s, border-bottom .18s, color .15s;
+      outline: none;
+      letter-spacing: 0.01em;
     }
     .tab-btn.active, .tab-btn:hover {
       background: var(--bg);
-      border-bottom: 2.5px solid var(--accent);
+      border-bottom: 3px solid var(--accent);
+      color: var(--table-head);
     }
     .tab-content {
       display: none;
-      animation: fadein .35s;
+      animation: fadein .38s;
     }
     .tab-content.active {
       display: block;
@@ -155,69 +174,77 @@
       from {opacity: 0;}
       to {opacity: 1;}
     }
-
     .plot-toolbar {
       display: flex;
-      gap: 1.7rem;
+      gap: 1.3rem;
       align-items: center;
-      margin-bottom: -2.5rem;
+      margin-bottom: -2.4rem;
       justify-content: flex-end;
     }
     .plot-toolbar button {
       border: none;
       background: none;
       color: var(--accent);
-      font-size: 1.25rem;
+      font-size: 1.20rem;
       cursor: pointer;
-      padding: 0.38rem 0.6rem 0.38rem 0.6rem;
-      border-radius: 6px;
+      padding: 0.38rem 0.6rem;
+      border-radius: 7px;
       transition: background .13s;
     }
     .plot-toolbar button:hover {
       background: var(--bg);
     }
     .plot-toolbar label {
-      font-size: .96rem;
+      font-size: .97rem;
       color: var(--text);
-      font-weight: 500;
+      font-weight: 600;
     }
     .plot-area {
-      margin-top: 2.7rem;
+      margin-top: 2.5rem;
       margin-bottom: .9rem;
       border-radius: 14px;
       overflow: hidden;
-      border: 1px solid var(--border);
-      background: var(--bg);
+      border: 1.2px solid var(--border);
+      background: var(--table-bg);
     }
-    #scatter, #forest {
+    #scatter, #forest, #manhattan_exposure, #manhattan_outcome, #qq_exposure, #qq_outcome {
       width: 100%;
-      height: 490px;
-      min-height: 390px;
+      height: 470px;
+      min-height: 350px;
       margin: 0 auto;
       display: block;
       border-radius: 10px;
     }
     table.dataTable {
       width: 100%;
-      background: transparent;
-      font-size: 1.02rem;
-      border-collapse: collapse;
+      background: var(--table-bg);
+      font-size: 1.05rem;
+      border-collapse: separate;
+      border-spacing: 0;
+      border-radius: 12px;
+      overflow: hidden;
     }
     .dataTables_wrapper .dt-buttons {
       float: right;
       margin-left: 1.2em;
+      margin-bottom: .6em;
     }
     table.dataTable thead th {
       background: var(--bg);
       color: var(--table-head);
       border-bottom: 2px solid var(--border);
-      font-weight: 700;
-      font-size: 1.05rem;
+      font-weight: 900;
+      font-size: 1.08rem;
+      padding-top: 0.9em;
+      padding-bottom: 0.9em;
+      letter-spacing: .01em;
     }
     table.dataTable tbody td {
       border-bottom: 1px solid var(--border);
       color: var(--text);
+      background: var(--table-bg);
       font-family: inherit;
+      padding: 0.6em 0.5em;
     }
     table.dataTable tfoot th {
       border-top: 2px solid var(--border);
@@ -237,46 +264,75 @@
     }
     .footer {
       text-align: center;
-      font-size: 0.92rem;
-      color: #8c8d91;
+      font-size: 0.95rem;
+      color: #9496b3;
       margin-top: 2.7rem;
       letter-spacing: .01em;
       padding-bottom: .7rem;
     }
     .toggle-theme {
       position: fixed;
-      top: 16px;
-      right: 22px;
+      top: 14px;
+      right: 19px;
       z-index: 9999;
       background: var(--card-bg);
       border: 1.5px solid var(--border);
       color: var(--accent);
-      padding: 0.55rem 1.12rem 0.52rem;
+      padding: 0.6rem 1.17rem 0.55rem;
       border-radius: 12px;
-      font-weight: 800;
+      font-weight: 900;
       cursor: pointer;
-      font-size: 1.11rem;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+      font-size: 1.14rem;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.13);
       transition: background .2s, color .16s;
     }
     [data-theme="dark"] .toggle-theme {
       background: var(--card-bg);
       color: var(--accent);
     }
-    @media (max-width: 720px) {
+    @media (max-width: 760px) {
       .dashboard { flex-direction: column; gap: 1.2rem; }
       .section { padding: 1.6rem 1.1rem; }
-      .container { padding: 0 1vw 3rem 1vw; }
-      .toggle-theme { padding: 0.5rem 0.7rem; font-size: 1.0rem;}
+      .container { padding: 0 0vw 3rem 0vw; }
+      .toggle-theme { padding: 0.5rem 0.7rem; font-size: 1.04rem;}
+      h1 { font-size: 1.35rem;}
+    }
+    ::selection { background: var(--accent); color: #fff; }
+    .mr-results-table {
+      width: 100%;
+      background: var(--table-bg);
+      border-radius: 14px;
+      overflow: hidden;
+      border-collapse: collapse;
+      margin-bottom: 0;
+    }
+    .mr-results-table thead th, .mr-results-table tbody td {
+      padding: 0.95em 0.7em;
+      border-bottom: 1px solid var(--border);
+      text-align: center;
+    }
+    .mr-results-table thead th {
+      background: var(--bg);
+      color: var(--table-head);
+      font-size: 1.08rem;
+      font-weight: 900;
+      letter-spacing: .01em;
+      border-bottom: 2px solid var(--border);
+    }
+    .mr-results-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+    .mr-results-table tbody td {
+      font-size: 1.01rem;
     }
   </style>
 </head>
 <body>
-  <button class="toggle-theme" onclick="toggleTheme()">🌓 Toggle Theme</button>
+  <button class="toggle-theme" id="theme-toggle-btn"><i class="fa-solid fa-circle-half-stroke"></i> Toggle Theme</button>
 
   <div class="container">
-    <h1>🧬 MR-CoPe Interactive Report</h1>
-    <p><strong>Date:</strong> <span id="today"></span></p>
+    <h1>🧬 MR-CoPe Interactive Report Dashboard</h1>
+    <p style="margin-bottom:2.2rem;"><strong>Date:</strong> <span id="today"></span></p>
 
     <div class="dashboard">
       <div class="card"><h3>🧬 Instruments</h3><p><!-- SNP_COUNT --></p></div>
@@ -285,16 +341,69 @@
       <div class="card"><h3>📉 P-value</h3><p><!-- IVW_P --></p></div>
     </div>
 
-    <!-- TAB SECTION -->
+    <!-- MR Results Section -->
+    <div class="section">
+      <h2>🧮 MR Results</h2>
+      <div style="overflow-x:auto;">
+        <table class="mr-results-table">
+          <thead>
+            <tr>
+              <th>MR Method</th>
+              <th>OR</th>
+              <th>95% CI</th>
+              <th>p-value</th>
+              <th>Cochran Q</th>
+              <th>Q p-value</th>
+              <th>I² (%)</th>
+              <th>Egger Intercept p-value</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>IVW</td>
+              <td><!-- IVW_OR --></td>
+              <td><!-- IVW_CI --></td>
+              <td><!-- IVW_P --></td>
+              <td><!-- IVW_Q --></td>
+              <td><!-- IVW_QP --></td>
+              <td><!-- IVW_I2 --></td>
+              <td>—</td>
+            </tr>
+            <tr>
+              <td>WME</td>
+              <td><!-- WME_OR --></td>
+              <td><!-- WME_CI --></td>
+              <td><!-- WME_P --></td>
+              <td>—</td>
+              <td>—</td>
+              <td><!-- WME_I2 --></td>
+              <td>—</td>
+            </tr>
+            <tr>
+              <td>Egger</td>
+              <td><!-- EGGER_OR --></td>
+              <td><!-- EGGER_CI --></td>
+              <td><!-- EGGER_P --></td>
+              <td><!-- EGGER_Q --></td>
+              <td><!-- EGGER_QP --></td>
+              <td><!-- EGGER_I2 --></td>
+              <td><!-- EGGER_INT_P --></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SNP Table Tab -->
     <div class="tabbed">
       <div class="tab-buttons">
         <button class="tab-btn active" data-tab="tab1"><i class="fa-solid fa-dna"></i> SNP Table</button>
         <button class="tab-btn" data-tab="tab2"><i class="fa-solid fa-chart-scatter"></i> MR Scatter Plot</button>
         <button class="tab-btn" data-tab="tab3"><i class="fa-solid fa-tree"></i> Forest Plot</button>
-        <button class="tab-btn" data-tab="tab4"><i class="fa-solid fa-table"></i> Method Summary</button>
+        <button class="tab-btn" data-tab="tab4"><i class="fa-solid fa-chart-column"></i> Manhattan/QQ</button>
+        <button class="tab-btn" data-tab="tab5"><i class="fa-solid fa-table"></i> Method Summary</button>
       </div>
 
-      <!-- SNP TABLE TAB -->
       <div class="tab-content active" id="tab1">
         <div class="section" style="margin:0;">
           <h2>📊 SNP Summary Table</h2>
@@ -306,11 +415,15 @@
           <table id="snpTable" class="display nowrap" style="width:100%;">
             <thead>
               <tr>
-                <th>SNP</th>
-                <th>Beta_Exposure</th>
-                <th>P_Exposure</th>
-                <th>Beta_Outcome</th>
-                <th>P_Outcome</th>
+                <th>rsID</th>
+                <th>Beta Exposure</th>
+                <th>SE Exposure</th>
+                <th>P Exposure</th>
+                <th>Beta Outcome</th>
+                <th>SE Outcome</th>
+                <th>P Outcome</th>
+                <th>Effect Allele</th>
+                <th>Other Allele</th>
               </tr>
             </thead>
             <tbody>
@@ -320,7 +433,6 @@
         </div>
       </div>
 
-      <!-- MR SCATTER TAB -->
       <div class="tab-content" id="tab2">
         <div class="section" style="margin:0;">
           <h2>📈 MR Scatter Plot</h2>
@@ -335,7 +447,6 @@
         </div>
       </div>
 
-      <!-- FOREST PLOT TAB -->
       <div class="tab-content" id="tab3">
         <div class="section" style="margin:0;">
           <h2>🌲 Forest Plot of SNP Effects</h2>
@@ -350,8 +461,19 @@
         </div>
       </div>
 
-      <!-- METHOD TABLE TAB -->
+      <!-- Manhattan/QQ Tab -->
       <div class="tab-content" id="tab4">
+        <div class="section" style="margin:0;">
+          <h2>📈 Manhattan &amp; Q-Q Plots</h2>
+          <div class="plot-area"><div id="manhattan_exposure"></div></div>
+          <div class="plot-area"><div id="manhattan_outcome"></div></div>
+          <div class="plot-area"><div id="qq_exposure"></div></div>
+          <div class="plot-area"><div id="qq_outcome"></div></div>
+        </div>
+      </div>
+
+      <!-- Method Summary Tab -->
+      <div class="tab-content" id="tab5">
         <div class="section" style="margin:0;">
           <h2>📋 MR Method Summary</h2>
           <div class="zoom-slider">
@@ -364,9 +486,11 @@
               <tr>
                 <th>Method</th>
                 <th>Estimate</th>
+                <th>SE</th>
                 <th>P-value</th>
                 <th>CI Lower</th>
                 <th>CI Upper</th>
+                <th># SNPs</th>
               </tr>
             </thead>
             <tbody>
@@ -376,27 +500,30 @@
         </div>
       </div>
     </div>
-    <!-- END TABS -->
-
     <div class="footer">
-      MR-CoPe Pipeline · Open Source · v1.0 · <a href="mailto:mrcope@openepi.org" style="color:inherit;">Contact Us</a>
+      MR-CoPe Pipeline &mdash; Open Source &mdash; v1.0 &mdash; <a href="mailto:gcc46@bath.ac.uk" style="color:inherit;">Contact Us</a>
     </div>
   </div>
-
   <script>
-    // --- Date ---
     document.getElementById("today").textContent = new Date().toLocaleDateString();
-
-    // --- Tabs ---
-    $(".tab-btn").click(function(){
+    function toggleTheme() {
+      const root = document.documentElement;
+      const newTheme = root.getAttribute("data-theme") === "light" ? "dark" : "light";
+      root.setAttribute("data-theme", newTheme);
+      localStorage.setItem("mrcope-theme", newTheme);
+    }
+    (function(){
+      let saved = localStorage.getItem("mrcope-theme");
+      if(saved) document.documentElement.setAttribute("data-theme", saved);
+    })();
+    document.getElementById("theme-toggle-btn").onclick = toggleTheme;
+    $(document).on("click", ".tab-btn", function(){
       var tab = $(this).data('tab');
       $(".tab-btn").removeClass('active');
       $(this).addClass('active');
       $(".tab-content").removeClass('active');
       $("#" + tab).addClass('active');
     });
-
-    // --- DataTables: SNP Table ---
     $(document).ready(function () {
       let snpTable = $('#snpTable').DataTable({
         dom: 'Bfrtip',
@@ -415,8 +542,6 @@
         $('#snpTable').css('font-size', (1.01*v) + 'rem');
         $('#tableZoomVal').text(v.toFixed(2) + '×');
       });
-
-      // Method Table
       let methodTable = $('#methodTable').DataTable({
         dom: 'Bfrtip',
         buttons: [
@@ -434,31 +559,22 @@
         $('#methodZoomVal').text(v.toFixed(2) + '×');
       });
     });
-
-    // --- Plotly: Download as PNG/PDF & Zoom ---
     function downloadPlot(id, filename, format) {
       let plot = document.getElementById(id);
       Plotly.downloadImage(plot, {format: format, filename: filename.replace(/\.\w+$/,'')});
     }
-
     var plotZoom = {scatter: 1, forest: 1};
     function zoomPlot(id, direction) {
-      // direction: 1 (in), -1 (out)
       plotZoom[id] = Math.max(0.6, Math.min(2.6, plotZoom[id] + (direction*0.14)));
-      Plotly.relayout(id, { 'xaxis.zoom': null, 'yaxis.zoom': null, 'width': Math.round(920 * plotZoom[id]), 'height': Math.round(490 * plotZoom[id]) });
+      Plotly.relayout(id, { 'width': Math.round(940 * plotZoom[id]), 'height': Math.round(470 * plotZoom[id]) });
       document.getElementById(id+"ZoomVal").textContent = Math.round(plotZoom[id]*100)+"%";
     }
-
-    // --- Plotly Plots ---
-    Plotly.newPlot('scatter', <!-- SCATTER_JSON -->, {responsive:true});
-    Plotly.newPlot('forest', <!-- FOREST_JSON -->, {responsive:true});
-
-    // --- Theme Toggle ---
-    function toggleTheme() {
-      const root = document.documentElement;
-      const current = root.getAttribute("data-theme");
-      root.setAttribute("data-theme", current === "light" ? "dark" : "light");
-    }
+    Plotly.newPlot('scatter', [{x: [1,2,3], y: [4,5,6], type: 'scatter', mode: 'markers', marker: {size: 14}}], {responsive:true, margin: {t: 30}});
+    Plotly.newPlot('forest', [{type: 'bar', x: [0.8, 1.2, 1.1], y: ['rs123', 'rs456', 'rs789'], orientation: 'h'}], {responsive:true, margin: {t: 30}});
+    Plotly.newPlot('manhattan_exposure', [{x:[1,2,3],y:[2,3,4],type:'scatter',mode:'markers'}], {responsive:true, title:"Exposure Manhattan"});
+    Plotly.newPlot('manhattan_outcome', [{x:[1,2,3],y:[3,2,1],type:'scatter',mode:'markers'}], {responsive:true, title:"Outcome Manhattan"});
+    Plotly.newPlot('qq_exposure', [{x:[0,1,2],y:[0,1,2],type:'scatter',mode:'markers'}], {responsive:true, title:"Exposure Q-Q"});
+    Plotly.newPlot('qq_outcome', [{x:[0,1,2],y:[2,1,0],type:'scatter',mode:'markers'}], {responsive:true, title:"Outcome Q-Q"});
   </script>
 </body>
 </html>
