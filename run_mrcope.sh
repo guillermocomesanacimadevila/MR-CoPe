@@ -23,6 +23,7 @@ NC='\033[0m' # No Color
 # --- Trap to handle exit, Ctrl+C, cleanup, etc ---
 cleanup() {
   echo -e "\n${RED}🛑 Pipeline interrupted or failed. Exiting...${NC}"
+  echo -e "${YEL}💡 You can resume where you left off by running this script again (Nextflow will pick up from the last successful step).${NC}"
   exit 1
 }
 trap cleanup INT TERM
@@ -112,58 +113,35 @@ fi
 
 ###############################################################################
 
-# --- Docker Daemon Check/Start (cross-platform) ---
-docker_is_running() {
-  docker info >/dev/null 2>&1
-}
-
-try_start_docker() {
-  if [[ "$OSTYPE" == "darwin"* ]]; then
-    echo "🐳 Attempting to open Docker Desktop on macOS..."
-    open -a Docker || {
-      echo -e "${RED}❌ Could not launch Docker Desktop. Please start Docker manually and rerun.${NC}"
-      exit 1
-    }
-    echo "⏳ Waiting for Docker Desktop to launch (this may take ~30s)..."
-    while ! docker_is_running; do sleep 2; done
-  elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    echo "🐳 Attempting to start Docker service on Linux..."
-    sudo systemctl start docker || {
-      echo -e "${RED}❌ Could not start Docker service. Please start Docker manually and rerun.${NC}"
-      exit 1
-    }
-    echo "⏳ Waiting for Docker daemon to be ready..."
-    while ! docker_is_running; do sleep 2; done
-  else
-    echo -e "${YEL}❓ Unrecognized OS. Please ensure Docker is running, then rerun.${NC}"
-    exit 1
-  fi
-}
-
-echo "🔍 Checking for Docker daemon..."
-if ! docker_is_running; then
-  echo -e "${YEL}⚠️  Docker daemon does not appear to be running.${NC}"
-  try_start_docker
-fi
-echo -e "${GRN}✅ Docker is running.${NC}"
-
-# --- Nextflow Executable Path ---
-NF_CMD=nextflow
-
-# --- Create Results Directory If Needed ---
+# --- Results Dir, Logging & Debugging ---
 mkdir -p ./results
+
+FILTER_SUMMARY="./results/filter_summary.csv"
+PARAM_LOG="./results/parameter_log.txt"
+echo "step,file,kept,removed,message" > "$FILTER_SUMMARY"
+echo "MR-CoPe parameter log" > "$PARAM_LOG"
+echo "date: $(date)" >> "$PARAM_LOG"
+echo "MR-CoPe version: $VERSION" >> "$PARAM_LOG"
+
+append_filter_summary() {
+  # Usage: append_filter_summary "step" "file" "kept" "removed" "msg"
+  echo "$1,$2,$3,$4,$5" >> "$FILTER_SUMMARY"
+}
+append_param_log() {
+  echo "$1: $2" >> "$PARAM_LOG"
+}
 
 # ------------------------ Input Type Selection ------------------------
 read -rp "🧬 Do you have VCF files or CSV/TSV summary stats? [vcf/csv]: " INPUT_TYPE
 INPUT_TYPE=$(echo "$INPUT_TYPE" | tr '[:upper:]' '[:lower:]')
+append_param_log "input_type" "$INPUT_TYPE"
 
 if [[ "$INPUT_TYPE" != "vcf" && "$INPUT_TYPE" != "csv" ]]; then
   echo -e "${RED}❌ ERROR: Unknown input format '$INPUT_TYPE'. Please enter 'vcf' or 'csv'.${NC}"
   exit 1
 fi
 
-# ------------------------ File Input Collection ------------------------
-
+# ------------------------ File Input Collection + Validation ------------------------
 if [[ "$INPUT_TYPE" == "vcf" ]]; then
   read -rp "📥 Enter path to Exposure VCF (.vcf or .vcf.gz): " EXPOSURE_VCF
   read -rp "📥 Enter path to Outcome VCF (.vcf or .vcf.gz): " OUTCOME_VCF
@@ -172,20 +150,24 @@ if [[ "$INPUT_TYPE" == "vcf" ]]; then
     if [[ ! -f "$file" ]]; then
       echo -e "${RED}❌ ERROR: File not found: $file${NC}"
       exit 1
+    elif [[ ! -s "$file" ]]; then
+      echo -e "${RED}❌ ERROR: File is empty: $file${NC}"
+      exit 1
     fi
   done
+  append_param_log "exposure_vcf" "$EXPOSURE_VCF"
+  append_param_log "outcome_vcf" "$OUTCOME_VCF"
 
   read -rp "🧪 Are the p-values in the VCF encoded as -log10(p)? [y/n]: " LOG10_INPUT
   LOG10_INPUT=$(echo "$LOG10_INPUT" | tr '[:upper:]' '[:lower:]')
+  append_param_log "log10_flag" "$LOG10_INPUT"
 
   echo "🔄 Parsing VCF: $EXPOSURE_VCF → ./tmp_exposure.csv"
   python3 - <<EOF
-import gzip, csv
-
+import gzip, csv, sys
 vcf_path = "$EXPOSURE_VCF"
 csv_path = "./tmp_exposure.csv"
 is_log10 = "$LOG10_INPUT" == "y"
-
 def parse_sample_field(field):
     es, se, lp, af, rsid = field.split(":")
     try:
@@ -193,59 +175,41 @@ def parse_sample_field(field):
     except:
         pval = None
     return {
-        "BETA": float(es),
-        "SE": float(se),
-        "PVALUE": pval,
-        "EAF": float(af),
-        "SNP": rsid
+        "BETA": float(es), "SE": float(se), "PVALUE": pval,
+        "EAF": float(af), "SNP": rsid
     }
-
-with (gzip.open(vcf_path, 'rt') if vcf_path.endswith('.gz') else open(vcf_path, 'r')) as vcf_in, \
-     open(csv_path, 'w', newline='') as csv_out:
-
-    writer = None
+with (gzip.open(vcf_path, 'rt') if vcf_path.endswith('.gz') else open(vcf_path, 'r')) as vcf_in, open(csv_path, 'w', newline='') as csv_out:
+    writer = None; rows = 0
     for line in vcf_in:
-        if line.startswith("##"):
-            continue
+        if line.startswith("##"): continue
         if line.startswith("#CHROM"):
             header = line.strip().lstrip("#").split("\t")
             format_col = header.index("FORMAT")
             sample_col = format_col + 1
-            writer = csv.DictWriter(csv_out, fieldnames=[
-                "SNP", "CHR", "BP", "A1", "A2", "BETA", "SE", "PVALUE", "EAF"
-            ])
-            writer.writeheader()
-            continue
-
+            writer = csv.DictWriter(csv_out, fieldnames=["SNP","CHR","BP","A1","A2","BETA","SE","PVALUE","EAF"])
+            writer.writeheader(); continue
         fields = line.strip().split("\t")
-        if len(fields) <= sample_col:
-            continue
+        if len(fields) <= sample_col: continue
         chrom, pos, snp_id, ref, alt = fields[0], fields[1], fields[2], fields[3], fields[4]
         try:
             stats = parse_sample_field(fields[sample_col])
             writer.writerow({
-                "SNP": stats["SNP"],
-                "CHR": chrom,
-                "BP": pos,
-                "A1": alt,
-                "A2": ref,
-                "BETA": stats["BETA"],
-                "SE": stats["SE"],
-                "PVALUE": stats["PVALUE"],
-                "EAF": stats["EAF"]
-            })
+                "SNP": stats["SNP"], "CHR": chrom, "BP": pos, "A1": alt, "A2": ref,
+                "BETA": stats["BETA"], "SE": stats["SE"], "PVALUE": stats["PVALUE"], "EAF": stats["EAF"]
+            }); rows += 1
         except Exception as e:
-            print(f"⚠️ Skipping line at position {pos}: {e}")
+            print(f"⚠️ Skipping line at position {pos}: {e}", file=sys.stderr)
+    print(rows, file=sys.stderr)
 EOF
+  NROWS=$(awk 'END{print NR-1}' ./tmp_exposure.csv)
+  append_filter_summary "vcf_parse_exposure" "./tmp_exposure.csv" "$NROWS" "NA" "VCF→CSV conversion"
 
   echo "🔄 Parsing VCF: $OUTCOME_VCF → ./tmp_outcome.csv"
   python3 - <<EOF
-import gzip, csv
-
+import gzip, csv, sys
 vcf_path = "$OUTCOME_VCF"
 csv_path = "./tmp_outcome.csv"
 is_log10 = "$LOG10_INPUT" == "y"
-
 def parse_sample_field(field):
     es, se, lp, af, rsid = field.split(":")
     try:
@@ -253,50 +217,34 @@ def parse_sample_field(field):
     except:
         pval = None
     return {
-        "BETA": float(es),
-        "SE": float(se),
-        "PVALUE": pval,
-        "EAF": float(af),
-        "SNP": rsid
+        "BETA": float(es), "SE": float(se), "PVALUE": pval,
+        "EAF": float(af), "SNP": rsid
     }
-
-with (gzip.open(vcf_path, 'rt') if vcf_path.endswith('.gz') else open(vcf_path, 'r')) as vcf_in, \
-     open(csv_path, 'w', newline='') as csv_out:
-
-    writer = None
+with (gzip.open(vcf_path, 'rt') if vcf_path.endswith('.gz') else open(vcf_path, 'r')) as vcf_in, open(csv_path, 'w', newline='') as csv_out:
+    writer = None; rows = 0
     for line in vcf_in:
-        if line.startswith("##"):
-            continue
+        if line.startswith("##"): continue
         if line.startswith("#CHROM"):
             header = line.strip().lstrip("#").split("\t")
             format_col = header.index("FORMAT")
             sample_col = format_col + 1
-            writer = csv.DictWriter(csv_out, fieldnames=[
-                "SNP", "CHR", "BP", "A1", "A2", "BETA", "SE", "PVALUE", "EAF"
-            ])
-            writer.writeheader()
-            continue
-
+            writer = csv.DictWriter(csv_out, fieldnames=["SNP","CHR","BP","A1","A2","BETA","SE","PVALUE","EAF"])
+            writer.writeheader(); continue
         fields = line.strip().split("\t")
-        if len(fields) <= sample_col:
-            continue
+        if len(fields) <= sample_col: continue
         chrom, pos, snp_id, ref, alt = fields[0], fields[1], fields[2], fields[3], fields[4]
         try:
             stats = parse_sample_field(fields[sample_col])
             writer.writerow({
-                "SNP": stats["SNP"],
-                "CHR": chrom,
-                "BP": pos,
-                "A1": alt,
-                "A2": ref,
-                "BETA": stats["BETA"],
-                "SE": stats["SE"],
-                "PVALUE": stats["PVALUE"],
-                "EAF": stats["EAF"]
-            })
+                "SNP": stats["SNP"], "CHR": chrom, "BP": pos, "A1": alt, "A2": ref,
+                "BETA": stats["BETA"], "SE": stats["SE"], "PVALUE": stats["PVALUE"], "EAF": stats["EAF"]
+            }); rows += 1
         except Exception as e:
-            print(f"⚠️ Skipping line at position {pos}: {e}")
+            print(f"⚠️ Skipping line at position {pos}: {e}", file=sys.stderr)
+    print(rows, file=sys.stderr)
 EOF
+  NROWS=$(awk 'END{print NR-1}' ./tmp_outcome.csv)
+  append_filter_summary "vcf_parse_outcome" "./tmp_outcome.csv" "$NROWS" "NA" "VCF→CSV conversion"
 
   EXPOSURE_PATH="./tmp_exposure.csv"
   OUTCOME_PATH="./tmp_outcome.csv"
@@ -310,11 +258,17 @@ else
     if [[ ! -f "$file" ]]; then
       echo -e "${RED}❌ ERROR: File not found: $file${NC}"
       exit 1
+    elif [[ ! -s "$file" ]]; then
+      echo -e "${RED}❌ ERROR: File is empty: $file${NC}"
+      exit 1
     fi
   done
+  append_param_log "exposure_csv" "$EXPOSURE_PATH"
+  append_param_log "outcome_csv" "$OUTCOME_PATH"
 
   read -rp "🧪 Are the p-values in your input files already -log10(p)? [y/n]: " LOG10_FLAG
   LOG10_FLAG=$(echo "$LOG10_FLAG" | tr '[:upper:]' '[:lower:]')
+  append_param_log "log10_flag" "$LOG10_FLAG"
 fi
 
 # ------------------------ LD Clumping Settings ------------------------
@@ -329,6 +283,20 @@ read -rp "🔗 LD clumping r² threshold (default: 0.001): " CLUMP_R2
 CLUMP_KB="${CLUMP_KB:-10000}"
 CLUMP_R2="${CLUMP_R2:-0.001}"
 
+# ------------------------ Edge Case Warnings ------------------------
+if [[ "$CLUMP_KB" -gt 100000 ]]; then
+  echo -e "${YEL}⚠️ WARNING: You entered a very large window size (${CLUMP_KB} kb). This may remove too many SNPs.${NC}"
+fi
+if [[ "$CLUMP_KB" -lt 50 ]]; then
+  echo -e "${YEL}⚠️ WARNING: You entered a very small window size (${CLUMP_KB} kb). This may retain highly correlated SNPs.${NC}"
+fi
+if (( $(echo "$CLUMP_R2 == 1" | bc -l) )); then
+  echo -e "${YEL}⚠️ WARNING: r² = 1 means no LD pruning will be performed.${NC}"
+fi
+if (( $(echo "$CLUMP_R2 < 0.0001" | bc -l) )); then
+  echo -e "${YEL}⚠️ WARNING: Very low r² will keep almost no SNPs.${NC}"
+fi
+
 if ! [[ "$CLUMP_KB" =~ ^[0-9]+$ ]]; then
   echo -e "${RED}❌ Invalid clump_kb value. Must be an integer.${NC}"
   exit 1
@@ -336,6 +304,42 @@ fi
 if ! awk "BEGIN {exit !($CLUMP_R2 > 0 && $CLUMP_R2 <= 1)}"; then
   echo -e "${RED}❌ Invalid clump_r2 value. Must be a number > 0 and ≤ 1 (e.g., 0.01, 1.0).${NC}"
   exit 1
+fi
+
+# ------------------------ LD Population Selection ------------------------
+echo ""
+echo "🌍 LD Reference Population:"
+echo "   - EUR (European, default)"
+echo "   - AFR (African)"
+echo "   - EAS (East Asian)"
+echo "   - SAS (South Asian)"
+echo "   - AMR (Admixed American/Latino)"
+read -rp "LD reference population for clumping? [EUR/AFR/EAS/SAS/AMR] (default: EUR): " LD_POP
+LD_POP="${LD_POP:-EUR}"
+append_param_log "ld_pop" "$LD_POP"
+
+# ------------------------ Clumping Sensitivity Panel ------------------------
+echo ""
+read -rp "🧪 Run clumping sensitivity panel (try several kb/r² combinations in parallel)? [y/N]: " SENS_PANEL
+SENS_PANEL=$(echo "$SENS_PANEL" | tr '[:upper:]' '[:lower:]')
+
+if [[ "$SENS_PANEL" == "y" ]]; then
+  echo -e "${YEL}Running clumping with multiple parameter combinations...${NC}"
+  PANEL_KB=(500 1000 5000 10000)
+  PANEL_R2=(0.01 0.05 0.1 0.5)
+  PANEL_LOG="./results/clumping_sensitivity_panel.csv"
+  echo "window_kb,r2,num_SNPs_retained" > "$PANEL_LOG"
+  for KB in "${PANEL_KB[@]}"; do
+    for R2 in "${PANEL_R2[@]}"; do
+      OUT="./results/tmp_clump_${KB}_${R2}.csv"
+      docker run --rm -v "$PWD":/data mrcope:latest \
+        Rscript /app/03_linkage_disequillibrium.R "$EXPOSURE_PATH" "$OUT" "$KB" "$R2" "$LD_POP"
+      COUNT=$(awk 'END{print NR-1}' "$OUT")
+      echo "$KB,$R2,$COUNT" >> "$PANEL_LOG"
+      rm -f "$OUT"
+    done
+  done
+  echo -e "${GRN}Panel complete. Results in $PANEL_LOG${NC}"
 fi
 
 # -------------------- Print Summary Table Before Run -----------------------
@@ -346,6 +350,7 @@ printf "  %-22s %s\n" "Exposure file:" "$EXPOSURE_PATH"
 printf "  %-22s %s\n" "Outcome file:" "$OUTCOME_PATH"
 printf "  %-22s %s\n" "LD window (kb):" "$CLUMP_KB"
 printf "  %-22s %s\n" "LD r² cutoff:" "$CLUMP_R2"
+printf "  %-22s %s\n" "LD population:" "$LD_POP"
 printf "  %-22s %s\n" "Output dir:" "./results"
 printf "  %-22s %s\n" "MR-CoPe version:" "$VERSION"
 echo "--------------------------------------------------------"
@@ -367,24 +372,38 @@ if ! docker image inspect "$IMAGE_NAME" > /dev/null 2>&1; then
 fi
 
 # --------- Save command to logfile for reproducibility --------------
+NF_CMD=nextflow
 CMD="$NF_CMD run main.nf -with-docker \"$IMAGE_NAME\" \
     --exposure \"$EXPOSURE_PATH\" \
     --outcome \"$OUTCOME_PATH\" \
     --log10_flag \"$LOG10_FLAG\" \
     --clump_kb \"$CLUMP_KB\" \
     --clump_r2 \"$CLUMP_R2\" \
+    --ld_pop \"$LD_POP\" \
     --output_dir \"./results\" \
     -resume"
 echo "$CMD" > ./results/mrcope_command.log
+append_param_log "run_command" "$CMD"
+
+echo ""
+echo -e "${YEL}💡 All key pipeline parameters saved in ${PARAM_LOG}."
+echo -e "${YEL}💡 Filter summaries will be written to ${FILTER_SUMMARY} after each major step."
+echo -e "${YEL}💡 If the pipeline is interrupted, just re-run with '-resume'.${NC}"
 
 # ------------------------ Run Pipeline ------------------------
 
 echo ""
 echo -e "${GRN}🚀 Launching MR-CoPe Pipeline with Docker...${NC}"
-eval $CMD
+if ! eval $CMD; then
+  echo -e "${RED}❌ Pipeline failed!${NC}"
+  echo -e "${YEL}💡 You can resume from where you left off using:${NC}"
+  echo -e "${YEL}   $CMD${NC}"
+  exit 1
+fi
 
 echo ""
 echo -e "${GRN}🎉 MR-CoPe Pipeline completed successfully!${NC}"
 echo -e "📦 Results are available in: ${YEL}./results/${NC}"
 echo -e "🔍 Review the HTML report or output files for your MR results."
+echo -e "${YEL}💡 See filter_summary.csv and parameter_log.txt for reproducibility & filtering stats.${NC}"
 echo "--------------------------------------------------------"
