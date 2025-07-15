@@ -43,13 +43,7 @@ git clone https://github.com/guillermocomesanacimadevila/MR-CoPe.git
 cd MR-CoPe
 ```
 
-### 2. Ensure Nextflow is Available
-
-```bash
-$($(find / -name nextflow -type f 2>/dev/null | head -n 1))
-```
-
-### 3. Run MR-CoPe
+### 2. Run MR-CoPe
 
 ```bash
 chmod +x run_mrcope.sh && ./run_mrcope.sh
