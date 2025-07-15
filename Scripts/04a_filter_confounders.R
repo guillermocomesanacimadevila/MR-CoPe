@@ -1,29 +1,16 @@
 #!/usr/bin/env Rscript
 
 # =============================================================================
-# MR-CoPe | PhenoScanner-Based Confounder Filtering (Strict Mode)
-# -----------------------------------------------------------------------------
-# Description:
-#   Removes SNPs associated with any trait that does not match the specified
-#   exposure keyword(s). Keeps only "clean" instruments with no known pleiotropy.
-#
-# Usage:
-#   Rscript 04a_filter_confounders.R <input_ld_pruned.csv> <output_filtered.csv> "<target_keyword>"
-#
-# Example:
-#   Rscript 04a_filter_confounders.R ld_pruned_SNPs.csv filtered_SNPs.csv "LDL|cholesterol"
-#
-# Author: MR-CoPe Team (updated July 2025)
+# MR-CoPe | PhenoScanner-Based Confounder Filtering (Strict Mode, Batch, Robust)
 # =============================================================================
 
 suppressPackageStartupMessages({
   library(dplyr)
   library(readr)
-  library(httr)
+  library(phenoscanner)
 })
 
 args <- commandArgs(trailingOnly = TRUE)
-
 if (length(args) != 3) {
   cat("❌ ERROR: Invalid number of arguments.\n")
   cat("Usage: Rscript 04a_filter_confounders.R <input_csv> <output_csv> '<target_keyword>'\n")
@@ -33,19 +20,22 @@ if (length(args) != 3) {
 input_file  <- args[1]
 output_file <- args[2]
 target_keyword <- tolower(args[3])
+filter_log_file <- sub("\\.csv$", "_filter_log.csv", output_file)
+
+cat(sprintf("\n=== MR-CoPe PhenoScanner Strict Mode Filter ===\n"))
+cat(sprintf("Input:      %s\n", input_file))
+cat(sprintf("Output:     %s\n", output_file))
+cat(sprintf("Keyword(s): %s\n", target_keyword))
+cat(sprintf("Filter log: %s\n\n", filter_log_file))
 
 if (!file.exists(input_file)) {
   cat("❌ ERROR: Input file not found:", input_file, "\n")
   quit(status = 1)
 }
 
-# -----------------------
-# Load input SNPs
-# -----------------------
-cat("📥 Loading:", input_file, "\n")
 gwas <- read_csv(input_file, show_col_types = FALSE)
 
-# Robustly ensure 'SNP' column exists
+# Ensure SNP col
 if (!"SNP" %in% colnames(gwas)) {
   if ("rsid" %in% colnames(gwas)) {
     cat("🛠️  Renaming 'rsid' to 'SNP'...\n")
@@ -57,80 +47,63 @@ if (!"SNP" %in% colnames(gwas)) {
 }
 
 if (nrow(gwas) == 0) {
-  cat("⚠️  Input file has 0 rows. Writing empty output and exiting.\n")
+  cat("⚠️  Input file has 0 rows. Writing empty output and filter log.\n")
   file.create(output_file)
+  write_csv(tibble(SNP=character(), removed=logical(), reason=character()), filter_log_file)
   quit(status = 0)
 }
 
 snps <- unique(gwas$SNP)
-cat("🔬 SNPs to evaluate:", length(snps), "\n")
+if (length(snps) > 10000) {
+  cat(sprintf("⚠️  WARNING: You are querying %d SNPs. PhenoScanner batch may fail above 10,000. Consider splitting.\n", length(snps)))
+}
+
+cat("🔬 Querying", length(snps), "SNPs via phenoscanner...\n")
 cat("🎯 Target trait pattern:", target_keyword, "\n\n")
 
-if (length(snps) == 0) {
-  cat("⚠️  No SNPs to query. Writing empty output and exiting.\n")
-  file.create(output_file)
+ps_res <- tryCatch(
+  phenoscanner::phenoscanner(snpquery = snps, pvalue = 1),
+  error = function(e) {
+    cat("❌ ERROR: Phenoscanner batch query failed:", conditionMessage(e), "\n")
+    NULL
+  }
+)
+
+if (is.null(ps_res) || is.null(ps_res$results)) {
+  cat("⚠️  No PhenoScanner data for any SNP. Keeping all SNPs (check connection/logs).\n")
+  write_csv(gwas, output_file)
+  write_csv(tibble(SNP=snps, removed=FALSE, reason="PhenoScanner query failed or no hits"), filter_log_file)
   quit(status = 0)
 }
 
-# -----------------------
-# Query PhenoScanner API
-# -----------------------
-query_phenoscanner <- function(snp) {
-  tryCatch({
-    res <- GET("http://www.phenoscanner.medschl.cam.ac.uk/api",
-               query = list(query = snp, catalogue = "GWAS", p = 5e-8, build = 37, proxies = "no"),
-               timeout(15))
-    if (status_code(res) == 200 && grepl("^SNP", content(res, "text"))) {
-      read_tsv(content(res, "text"), show_col_types = FALSE)
-    } else {
-      NULL
-    }
-  }, error = function(e) {
-    cat("⚠️  Warning: Failed to query SNP", snp, "|", conditionMessage(e), "\n")
-    NULL
-  })
-}
+ps_tab <- ps_res$results
+ps_tab$trait_lc <- tolower(ps_tab$trait)
 
-# -----------------------
-# Filter SNPs strictly
-# -----------------------
-snps_to_remove <- c()
+# Map: for each SNP, does ANY trait fail to match keyword?
+snps_flagged <- ps_tab %>%
+  group_by(snp) %>%
+  summarize(off_target = any(!grepl(target_keyword, trait_lc)),
+            reason = paste(unique(trait_lc[!grepl(target_keyword, trait_lc)]), collapse="; ")) %>%
+  ungroup()
 
-for (i in seq_along(snps)) {
-  snp <- snps[i]
-  cat(sprintf("[%03d/%03d] 🔎 Checking SNP: %s\n", i, length(snps), snp))
+snps_to_remove <- snps_flagged %>% filter(off_target) %>% pull(snp)
+cat("🧹 SNPs flagged for removal (pleiotropy):", length(snps_to_remove), "\n")
 
-  dat <- query_phenoscanner(snp)
-  Sys.sleep(0.5)  # Respect API limits
-
-  if (!is.null(dat) && "trait" %in% colnames(dat)) {
-    traits <- tolower(dat$trait)
-
-    # STRICT mode: all traits must match the exposure keyword
-    if (!all(grepl(target_keyword, traits))) {
-      cat("🚫 Removing due to off-target traits:", snp, "\n")
-      snps_to_remove <- c(snps_to_remove, snp)
-    } else {
-      cat("✅ Retained (only associated with exposure):", snp, "\n")
-    }
-  }
-}
-
-# -----------------------
-# Save filtered results
-# -----------------------
+# Filtered output
 gwas_filtered <- gwas %>% filter(!SNP %in% snps_to_remove)
-
-# Ensure the output file always has a 'SNP' column
-if (!"SNP" %in% colnames(gwas_filtered)) {
-  if ("rsid" %in% colnames(gwas_filtered)) {
-    gwas_filtered <- gwas_filtered %>% rename(SNP = rsid)
-  }
-}
-
 write_csv(gwas_filtered, output_file)
 
-cat("\n🧹 SNPs removed:", length(snps_to_remove), "\n")
+# Write filter log for *all* input SNPs
+filter_log <- tibble(
+  SNP = snps,
+  removed = snps %in% snps_to_remove,
+  reason = ifelse(snps %in% snps_flagged$snp,
+                  snps_flagged$reason[match(snps, snps_flagged$snp)],
+                  "No PhenoScanner hit or all traits match")
+)
+write_csv(filter_log, filter_log_file)
+
 cat("✅ SNPs retained:", nrow(gwas_filtered), "\n")
 cat("💾 Output written to:", output_file, "\n")
+cat("📝 Filter log written to:", filter_log_file, "\n")
 cat("========================================================================\n")
