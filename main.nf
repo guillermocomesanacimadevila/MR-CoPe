@@ -9,6 +9,7 @@ params.log10_flag     = "n"              // Are input p-values already -log10(p)
 params.clump_kb       = 10000            // LD window in kb
 params.clump_r2       = 0.001            // LD clumping threshold
 params.trait_keyword  = null             // Trait to retain (e.g., "CRP", "LDL")
+params.ld_pop         = "EUR"            // LD reference population (NEW PARAM ADDED)
 
 // ========================== SCRIPTS ==========================
 workflow {
@@ -32,7 +33,7 @@ workflow {
     // Step 2: Preprocess GWAS (QC, merge, F-stat)
     gwas_processing(script_process, exposure_file, outcome_file)
 
-    // Step 3: LD pruning
+    // Step 3: LD pruning (add LD pop as arg)
     ld_filtering(script_ld, gwas_processing.out.filtered)
 
     // Step 4: Filter SNPs associated with confounding traits (PhenoScanner)
@@ -102,7 +103,8 @@ process ld_filtering {
 
     script:
     """
-    Rscript ${script} ${filtered} ld_pruned_SNPs.csv ${params.clump_kb} ${params.clump_r2}
+    # --- PASS LD POP AS FINAL ARG (ADDED) ---
+    Rscript ${script} ${filtered} ld_pruned_SNPs.csv ${params.clump_kb} ${params.clump_r2} ${params.ld_pop}
     """
 }
 
