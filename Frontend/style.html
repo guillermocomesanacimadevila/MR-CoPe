@@ -3,147 +3,279 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MR-CoPe Report</title>
+  <title>MR-CoPe | Mendelian Randomisation Dashboard</title>
 
   <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet"/>
 
   <!-- DataTables -->
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.5/css/jquery.dataTables.min.css"/>
+  <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.dataTables.min.css"/>
 
   <!-- Plotly -->
-  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
 
-  <!-- jQuery + DataTables -->
+  <!-- jQuery + DataTables + Extensions -->
   <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.5/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.print.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.colVis.min.js"></script>
+  <script src="https://cdn.datatables.net/scroller/2.2.0/js/dataTables.scroller.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.datatables.net/scroller/2.2.0/css/scroller.dataTables.min.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
 
   <style>
     :root {
-      --bg-light: #f9fafb;
-      --bg-dark: #1c1e21;
-      --text-light: #111;
-      --text-dark: #eee;
-      --card-bg-light: #fff;
-      --card-bg-dark: #2a2c2f;
+      --bg: #f7f9fb;
+      --card-bg: #fff;
       --accent: #007aff;
+      --danger: #e74c3c;
+      --table-head: #1a1f27;
+      --text: #222;
+      --shadow: 0 4px 28px rgba(0,0,0,0.09);
+      --border: #e6ecf2;
+      --border-radius: 18px;
+      --font-main: 'Inter', Arial, sans-serif;
+      --font-mono: 'JetBrains Mono', 'Fira Mono', 'Menlo', monospace;
+      --success: #38c172;
     }
-
     [data-theme="dark"] {
-      background-color: var(--bg-dark);
-      color: var(--text-dark);
+      --bg: #181a1b;
+      --card-bg: #23262a;
+      --accent: #0095ff;
+      --danger: #f35d5d;
+      --table-head: #eaeaea;
+      --text: #f7f7f7;
+      --shadow: 0 2px 16px rgba(0,0,0,0.35);
+      --border: #393e47;
+      --success: #38d39f;
     }
 
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: 'Inter', sans-serif;
-      background: var(--bg-light);
-      color: var(--text-light);
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-main);
+      font-size: 17px;
       margin: 0;
-      padding: 2rem;
-      transition: background 0.3s, color 0.3s;
+      padding: 0;
+      transition: background .3s, color .3s;
+      min-height: 100vh;
     }
-
-    [data-theme="dark"] body {
-      background: var(--bg-dark);
-      color: var(--text-dark);
-    }
-
     .container {
-      max-width: 1100px;
-      margin: auto;
+      max-width: 1200px;
+      margin: 2.2rem auto 0;
+      padding: 0 2vw 4rem 2vw;
     }
-
-    h1 {
-      font-size: 2rem;
-      margin-bottom: 1rem;
+    h1, h2, h3 {
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: var(--table-head);
+      margin-top: 0;
     }
-
     .dashboard {
       display: flex;
-      gap: 1rem;
-      margin: 2rem 0;
+      gap: 1.3rem;
+      margin: 2rem 0 2.5rem;
       flex-wrap: wrap;
+      justify-content: space-between;
     }
-
     .card {
-      background: var(--card-bg-light);
-      padding: 1.5rem;
-      border-radius: 14px;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.05);
-      flex: 1 1 200px;
-      transition: background 0.3s;
+      background: var(--card-bg);
+      box-shadow: var(--shadow);
+      border-radius: var(--border-radius);
+      flex: 1 1 220px;
+      min-width: 200px;
+      max-width: 290px;
+      padding: 2.1rem 1.5rem 1.4rem;
+      position: relative;
+      transition: box-shadow .2s;
+      margin-bottom: .8rem;
     }
-
-    [data-theme="dark"] .card {
-      background: var(--card-bg-dark);
-    }
-
     .card h3 {
-      font-size: 1rem;
-      margin: 0 0 0.5rem;
+      font-size: 1.1rem;
       color: var(--accent);
+      margin: 0 0 .3rem 0;
+      font-weight: 600;
+    }
+    .card p {
+      font-size: 1.95rem;
+      margin: 0;
+      color: var(--table-head);
+      font-weight: 800;
+      letter-spacing: -0.01em;
     }
 
     .section {
-      margin-bottom: 3rem;
-      background: var(--card-bg-light);
-      padding: 2rem;
-      border-radius: 12px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.04);
-      transition: background 0.3s;
+      background: var(--card-bg);
+      box-shadow: var(--shadow);
+      border-radius: var(--border-radius);
+      padding: 2.7rem 2.2rem 2.2rem;
+      margin-bottom: 3.5rem;
+      margin-top: 1.8rem;
+    }
+    .tabbed {
+      margin-bottom: 3.5rem;
+    }
+    .tab-buttons {
+      display: flex;
+      border-bottom: 1.5px solid var(--border);
+      gap: 2px;
+      margin-bottom: 1rem;
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      font-size: 1.09rem;
+      font-family: inherit;
+      font-weight: 700;
+      color: var(--accent);
+      padding: 0.7rem 2rem 0.6rem 1rem;
+      border-top-left-radius: 14px;
+      border-top-right-radius: 14px;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      transition: background .14s, border-bottom .17s;
+      outline: none;
+      margin-right: .2rem;
+    }
+    .tab-btn.active, .tab-btn:hover {
+      background: var(--bg);
+      border-bottom: 2.5px solid var(--accent);
+    }
+    .tab-content {
+      display: none;
+      animation: fadein .35s;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    @keyframes fadein {
+      from {opacity: 0;}
+      to {opacity: 1;}
     }
 
-    [data-theme="dark"] .section {
-      background: var(--card-bg-dark);
+    .plot-toolbar {
+      display: flex;
+      gap: 1.7rem;
+      align-items: center;
+      margin-bottom: -2.5rem;
+      justify-content: flex-end;
     }
-
+    .plot-toolbar button {
+      border: none;
+      background: none;
+      color: var(--accent);
+      font-size: 1.25rem;
+      cursor: pointer;
+      padding: 0.38rem 0.6rem 0.38rem 0.6rem;
+      border-radius: 6px;
+      transition: background .13s;
+    }
+    .plot-toolbar button:hover {
+      background: var(--bg);
+    }
+    .plot-toolbar label {
+      font-size: .96rem;
+      color: var(--text);
+      font-weight: 500;
+    }
+    .plot-area {
+      margin-top: 2.7rem;
+      margin-bottom: .9rem;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--bg);
+    }
+    #scatter, #forest {
+      width: 100%;
+      height: 490px;
+      min-height: 390px;
+      margin: 0 auto;
+      display: block;
+      border-radius: 10px;
+    }
     table.dataTable {
       width: 100%;
-      font-size: 0.95rem;
       background: transparent;
+      font-size: 1.02rem;
+      border-collapse: collapse;
     }
-
-    #scatter, #forest {
-      margin-top: 1rem;
+    .dataTables_wrapper .dt-buttons {
+      float: right;
+      margin-left: 1.2em;
     }
-
+    table.dataTable thead th {
+      background: var(--bg);
+      color: var(--table-head);
+      border-bottom: 2px solid var(--border);
+      font-weight: 700;
+      font-size: 1.05rem;
+    }
+    table.dataTable tbody td {
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      font-family: inherit;
+    }
+    table.dataTable tfoot th {
+      border-top: 2px solid var(--border);
+      background: var(--bg);
+    }
+    .zoom-slider {
+      margin-top: 1.3rem;
+      width: 260px;
+      max-width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 0.7em;
+    }
+    .zoom-slider input[type=range] {
+      width: 140px;
+      accent-color: var(--accent);
+    }
     .footer {
       text-align: center;
-      font-size: 0.85rem;
-      color: #888;
-      margin-top: 4rem;
+      font-size: 0.92rem;
+      color: #8c8d91;
+      margin-top: 2.7rem;
+      letter-spacing: .01em;
+      padding-bottom: .7rem;
     }
-
     .toggle-theme {
       position: fixed;
-      top: 20px;
-      right: 20px;
-      background: var(--card-bg-light);
-      border: none;
-      padding: 0.5rem 1rem;
-      border-radius: 10px;
-      font-weight: 600;
+      top: 16px;
+      right: 22px;
+      z-index: 9999;
+      background: var(--card-bg);
+      border: 1.5px solid var(--border);
+      color: var(--accent);
+      padding: 0.55rem 1.12rem 0.52rem;
+      border-radius: 12px;
+      font-weight: 800;
       cursor: pointer;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      transition: background 0.3s;
+      font-size: 1.11rem;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+      transition: background .2s, color .16s;
     }
-
     [data-theme="dark"] .toggle-theme {
-      background: var(--card-bg-dark);
-      color: var(--text-dark);
+      background: var(--card-bg);
+      color: var(--accent);
+    }
+    @media (max-width: 720px) {
+      .dashboard { flex-direction: column; gap: 1.2rem; }
+      .section { padding: 1.6rem 1.1rem; }
+      .container { padding: 0 1vw 3rem 1vw; }
+      .toggle-theme { padding: 0.5rem 0.7rem; font-size: 1.0rem;}
     }
   </style>
 </head>
 <body>
-
   <button class="toggle-theme" onclick="toggleTheme()">🌓 Toggle Theme</button>
 
   <div class="container">
-    <h1>🧬 MR-CoPe Results Report</h1>
+    <h1>🧬 MR-CoPe Interactive Report</h1>
     <p><strong>Date:</strong> <span id="today"></span></p>
 
     <div class="dashboard">
@@ -153,51 +285,98 @@
       <div class="card"><h3>📉 P-value</h3><p><!-- IVW_P --></p></div>
     </div>
 
-    <div class="section">
-      <h2>📊 SNP Summary Table</h2>
-      <table id="snpTable" class="display">
-        <thead>
-          <tr>
-            <th>SNP</th>
-            <th>Beta_Exposure</th>
-            <th>P_Exposure</th>
-            <th>Beta_Outcome</th>
-            <th>P_Outcome</th>
-          </tr>
-        </thead>
-        <tbody>
-          <!-- SNP_TABLE_ROWS -->
-        </tbody>
-      </table>
-    </div>
+    <!-- TAB SECTION -->
+    <div class="tabbed">
+      <div class="tab-buttons">
+        <button class="tab-btn active" data-tab="tab1"><i class="fa-solid fa-dna"></i> SNP Table</button>
+        <button class="tab-btn" data-tab="tab2"><i class="fa-solid fa-chart-scatter"></i> MR Scatter Plot</button>
+        <button class="tab-btn" data-tab="tab3"><i class="fa-solid fa-tree"></i> Forest Plot</button>
+        <button class="tab-btn" data-tab="tab4"><i class="fa-solid fa-table"></i> Method Summary</button>
+      </div>
 
-    <div class="section">
-      <h2>📈 MR Scatter Plot</h2>
-      <div id="scatter" style="height:450px;"></div>
-    </div>
+      <!-- SNP TABLE TAB -->
+      <div class="tab-content active" id="tab1">
+        <div class="section" style="margin:0;">
+          <h2>📊 SNP Summary Table</h2>
+          <div class="zoom-slider">
+            <label><i class="fa-solid fa-magnifying-glass"></i> Zoom:</label>
+            <input type="range" min="0.7" max="1.8" value="1" step="0.05" id="tableZoomSlider">
+            <span id="tableZoomVal">1.00×</span>
+          </div>
+          <table id="snpTable" class="display nowrap" style="width:100%;">
+            <thead>
+              <tr>
+                <th>SNP</th>
+                <th>Beta_Exposure</th>
+                <th>P_Exposure</th>
+                <th>Beta_Outcome</th>
+                <th>P_Outcome</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- SNP_TABLE_ROWS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-    <div class="section">
-      <h2>🌲 Forest Plot of SNP Effects</h2>
-      <div id="forest" style="height:450px;"></div>
-    </div>
+      <!-- MR SCATTER TAB -->
+      <div class="tab-content" id="tab2">
+        <div class="section" style="margin:0;">
+          <h2>📈 MR Scatter Plot</h2>
+          <div class="plot-toolbar">
+            <button onclick="downloadPlot('scatter', 'scatter.png', 'png')" title="Download as PNG"><i class="fa-solid fa-image"></i></button>
+            <button onclick="downloadPlot('scatter', 'scatter.pdf', 'pdf')" title="Download as PDF"><i class="fa-solid fa-file-pdf"></i></button>
+            <button onclick="zoomPlot('scatter', 1)" title="Zoom In"><i class="fa-solid fa-search-plus"></i></button>
+            <button onclick="zoomPlot('scatter', -1)" title="Zoom Out"><i class="fa-solid fa-search-minus"></i></button>
+            <label id="scatterZoomVal">100%</label>
+          </div>
+          <div class="plot-area"><div id="scatter"></div></div>
+        </div>
+      </div>
 
-    <div class="section">
-      <h2>📋 Method Summary</h2>
-      <table id="methodTable" class="display">
-        <thead>
-          <tr>
-            <th>Method</th>
-            <th>Estimate</th>
-            <th>P-value</th>
-            <th>CI Lower</th>
-            <th>CI Upper</th>
-          </tr>
-        </thead>
-        <tbody>
-          <!-- METHOD_TABLE_ROWS -->
-        </tbody>
-      </table>
+      <!-- FOREST PLOT TAB -->
+      <div class="tab-content" id="tab3">
+        <div class="section" style="margin:0;">
+          <h2>🌲 Forest Plot of SNP Effects</h2>
+          <div class="plot-toolbar">
+            <button onclick="downloadPlot('forest', 'forest.png', 'png')" title="Download as PNG"><i class="fa-solid fa-image"></i></button>
+            <button onclick="downloadPlot('forest', 'forest.pdf', 'pdf')" title="Download as PDF"><i class="fa-solid fa-file-pdf"></i></button>
+            <button onclick="zoomPlot('forest', 1)" title="Zoom In"><i class="fa-solid fa-search-plus"></i></button>
+            <button onclick="zoomPlot('forest', -1)" title="Zoom Out"><i class="fa-solid fa-search-minus"></i></button>
+            <label id="forestZoomVal">100%</label>
+          </div>
+          <div class="plot-area"><div id="forest"></div></div>
+        </div>
+      </div>
+
+      <!-- METHOD TABLE TAB -->
+      <div class="tab-content" id="tab4">
+        <div class="section" style="margin:0;">
+          <h2>📋 MR Method Summary</h2>
+          <div class="zoom-slider">
+            <label><i class="fa-solid fa-magnifying-glass"></i> Zoom:</label>
+            <input type="range" min="0.7" max="1.8" value="1" step="0.05" id="methodZoomSlider">
+            <span id="methodZoomVal">1.00×</span>
+          </div>
+          <table id="methodTable" class="display nowrap" style="width:100%;">
+            <thead>
+              <tr>
+                <th>Method</th>
+                <th>Estimate</th>
+                <th>P-value</th>
+                <th>CI Lower</th>
+                <th>CI Upper</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- METHOD_TABLE_ROWS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
+    <!-- END TABS -->
 
     <div class="footer">
       MR-CoPe Pipeline · Open Source · v1.0 · <a href="mailto:mrcope@openepi.org" style="color:inherit;">Contact Us</a>
@@ -205,21 +384,81 @@
   </div>
 
   <script>
+    // --- Date ---
     document.getElementById("today").textContent = new Date().toLocaleDateString();
 
-    $(document).ready(function () {
-      $('#snpTable').DataTable();
-      $('#methodTable').DataTable();
+    // --- Tabs ---
+    $(".tab-btn").click(function(){
+      var tab = $(this).data('tab');
+      $(".tab-btn").removeClass('active');
+      $(this).addClass('active');
+      $(".tab-content").removeClass('active');
+      $("#" + tab).addClass('active');
     });
 
+    // --- DataTables: SNP Table ---
+    $(document).ready(function () {
+      let snpTable = $('#snpTable').DataTable({
+        dom: 'Bfrtip',
+        buttons: [
+          {extend: 'csv', text: '<i class="fa-solid fa-download"></i> CSV', className: 'btn-csv'},
+          {extend: 'colvis', text: '<i class="fa-solid fa-table-cells"></i> Columns'}
+        ],
+        scrollX: true,
+        scroller: true,
+        pageLength: 18,
+        lengthMenu: [10, 18, 25, 50, 100],
+        language: {search: "🔍 Search SNPs:"}
+      });
+      $('#tableZoomSlider').on('input', function() {
+        let v = parseFloat(this.value);
+        $('#snpTable').css('font-size', (1.01*v) + 'rem');
+        $('#tableZoomVal').text(v.toFixed(2) + '×');
+      });
+
+      // Method Table
+      let methodTable = $('#methodTable').DataTable({
+        dom: 'Bfrtip',
+        buttons: [
+          {extend: 'csv', text: '<i class="fa-solid fa-download"></i> CSV', className: 'btn-csv'},
+          {extend: 'colvis', text: '<i class="fa-solid fa-table-cells"></i> Columns'}
+        ],
+        scrollX: true,
+        paging: false,
+        searching: false,
+        info: false
+      });
+      $('#methodZoomSlider').on('input', function() {
+        let v = parseFloat(this.value);
+        $('#methodTable').css('font-size', (1.01*v) + 'rem');
+        $('#methodZoomVal').text(v.toFixed(2) + '×');
+      });
+    });
+
+    // --- Plotly: Download as PNG/PDF & Zoom ---
+    function downloadPlot(id, filename, format) {
+      let plot = document.getElementById(id);
+      Plotly.downloadImage(plot, {format: format, filename: filename.replace(/\.\w+$/,'')});
+    }
+
+    var plotZoom = {scatter: 1, forest: 1};
+    function zoomPlot(id, direction) {
+      // direction: 1 (in), -1 (out)
+      plotZoom[id] = Math.max(0.6, Math.min(2.6, plotZoom[id] + (direction*0.14)));
+      Plotly.relayout(id, { 'xaxis.zoom': null, 'yaxis.zoom': null, 'width': Math.round(920 * plotZoom[id]), 'height': Math.round(490 * plotZoom[id]) });
+      document.getElementById(id+"ZoomVal").textContent = Math.round(plotZoom[id]*100)+"%";
+    }
+
+    // --- Plotly Plots ---
+    Plotly.newPlot('scatter', <!-- SCATTER_JSON -->, {responsive:true});
+    Plotly.newPlot('forest', <!-- FOREST_JSON -->, {responsive:true});
+
+    // --- Theme Toggle ---
     function toggleTheme() {
       const root = document.documentElement;
       const current = root.getAttribute("data-theme");
       root.setAttribute("data-theme", current === "light" ? "dark" : "light");
     }
-
-    Plotly.newPlot('scatter', <!-- SCATTER_JSON -->);
-    Plotly.newPlot('forest', <!-- FOREST_JSON -->);
   </script>
 </body>
 </html>
