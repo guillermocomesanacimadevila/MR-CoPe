@@ -53,6 +53,11 @@ RUN Rscript -e "install.packages('tidyverse', repos='https://cloud.r-project.org
 RUN Rscript -e "install.packages(c('TwoSampleMR', 'ieugwasr'), repos = c('https://mrcieu.r-universe.dev', 'https://cloud.r-project.org'))"
 
 # -----------------------------
+# Install phenoscanner (from GitHub, requires devtools)
+# -----------------------------
+RUN Rscript -e "devtools::install_github('phenoscanner/phenoscanner')"
+
+# -----------------------------
 # Set working directory
 # -----------------------------
 WORKDIR /app
