@@ -48,6 +48,70 @@ else
 fi
 echo -e "${GRN}MR-CoPe Version: $VERSION${NC}"
 
+###############################################################################
+#                  TOOLCHAIN CHECK AND AUTO-INSTALL SECTION                   #
+###############################################################################
+
+install_msg() { echo -e "${YEL}🔧 $1${NC}"; }
+
+# -------- Docker check/install ---------
+if ! command -v docker &> /dev/null; then
+    install_msg "Docker not found. Attempting to install Docker..."
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        curl -fsSL https://get.docker.com | sudo bash || { echo -e "${RED}❌ Failed to install Docker. Install manually.${NC}"; exit 1; }
+        sudo usermod -aG docker $USER
+        echo -e "${YEL}⚠️  Please log out and log back in for Docker permissions to update.${NC}"
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        if command -v brew &> /dev/null; then
+            brew install --cask docker || { echo -e "${RED}❌ Install Docker Desktop from https://www.docker.com/get-started/ (Mac).${NC}"; exit 1; }
+            echo "📝 Please start Docker Desktop manually from Applications."
+        else
+            echo -e "${RED}❌ Homebrew not found. Install Homebrew or Docker Desktop manually.${NC}"
+            exit 1
+        fi
+    else
+        echo -e "${RED}❌ Docker install: Unrecognized OS, please install manually.${NC}"
+        exit 1
+    fi
+else
+    echo -e "${GRN}✅ Docker is installed.${NC}"
+fi
+
+# -------- Java check/install (needed for Nextflow) ---------
+if ! command -v java &> /dev/null; then
+    install_msg "Java not found. Attempting to install OpenJDK 11..."
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        sudo apt-get update && sudo apt-get install -y openjdk-11-jre-headless || { echo -e "${RED}❌ Failed to install Java. Install manually.${NC}"; exit 1; }
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        if command -v brew &> /dev/null; then
+            brew install openjdk@11 || { echo -e "${RED}❌ Failed to install Java (brew). Install manually.${NC}"; exit 1; }
+            sudo ln -sfn /usr/local/opt/openjdk@11/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-11.jdk
+            export PATH="/usr/local/opt/openjdk@11/bin:$PATH"
+        else
+            echo -e "${RED}❌ Homebrew not found. Install Homebrew or Java manually.${NC}"
+            exit 1
+        fi
+    else
+        echo -e "${RED}❌ Java install: Unrecognized OS, please install manually.${NC}"
+        exit 1
+    fi
+else
+    echo -e "${GRN}✅ Java is installed.${NC}"
+fi
+
+# -------- Nextflow check/install ---------
+if ! command -v nextflow &> /dev/null; then
+    install_msg "Nextflow not found. Installing Nextflow..."
+    curl -fsSL https://get.nextflow.io | bash || { echo -e "${RED}❌ Failed to install Nextflow. Install manually.${NC}"; exit 1; }
+    sudo mv nextflow /usr/local/bin/
+    chmod +x /usr/local/bin/nextflow
+    export PATH="/usr/local/bin:$PATH"
+else
+    echo -e "${GRN}✅ Nextflow is installed.${NC}"
+fi
+
+###############################################################################
+
 # --- Docker Daemon Check/Start (cross-platform) ---
 docker_is_running() {
   docker info >/dev/null 2>&1
@@ -55,7 +119,6 @@ docker_is_running() {
 
 try_start_docker() {
   if [[ "$OSTYPE" == "darwin"* ]]; then
-    # macOS: open Docker Desktop
     echo "🐳 Attempting to open Docker Desktop on macOS..."
     open -a Docker || {
       echo -e "${RED}❌ Could not launch Docker Desktop. Please start Docker manually and rerun.${NC}"
@@ -64,7 +127,6 @@ try_start_docker() {
     echo "⏳ Waiting for Docker Desktop to launch (this may take ~30s)..."
     while ! docker_is_running; do sleep 2; done
   elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    # Linux: try to start docker daemon (needs sudo)
     echo "🐳 Attempting to start Docker service on Linux..."
     sudo systemctl start docker || {
       echo -e "${RED}❌ Could not start Docker service. Please start Docker manually and rerun.${NC}"
@@ -78,52 +140,15 @@ try_start_docker() {
   fi
 }
 
-echo "🔍 Checking for Docker..."
-if ! command -v docker &> /dev/null; then
-  echo -e "${RED}❌ Docker is not installed. Please install Docker and rerun.${NC}"
-  exit 1
-fi
-
+echo "🔍 Checking for Docker daemon..."
 if ! docker_is_running; then
   echo -e "${YEL}⚠️  Docker daemon does not appear to be running.${NC}"
   try_start_docker
 fi
 echo -e "${GRN}✅ Docker is running.${NC}"
 
-# --- Nextflow Check/Install ---
-echo "🔍 Checking for Nextflow..."
-
+# --- Nextflow Executable Path ---
 NF_CMD=nextflow
-if ! command -v nextflow &> /dev/null; then
-  # Try to load via modules (HPC etc)
-  if command -v module &>/dev/null; then
-    echo "💡 Loading Nextflow via 'module load nextflow'..."
-    module load nextflow || true
-  fi
-fi
-
-if ! command -v nextflow &> /dev/null; then
-  # Try local nextflow if present from previous install
-  if [[ -f "$MYDIR/nextflow" ]]; then
-    chmod +x "$MYDIR/nextflow"
-    export PATH="$MYDIR:$PATH"
-    NF_CMD="$MYDIR/nextflow"
-  else
-    echo -e "${YEL}⚠️  Nextflow not found, attempting local installation...${NC}"
-    curl -fsSL https://get.nextflow.io | bash
-    mv nextflow "$MYDIR/"
-    chmod +x "$MYDIR/nextflow"
-    export PATH="$MYDIR:$PATH"
-    NF_CMD="$MYDIR/nextflow"
-  fi
-fi
-
-if ! command -v nextflow &> /dev/null; then
-  echo -e "${RED}❌ Nextflow installation failed. Please install manually from https://www.nextflow.io/.${NC}"
-  exit 1
-fi
-
-echo -e "${GRN}✅ Nextflow is available.${NC}"
 
 # --- Create Results Directory If Needed ---
 mkdir -p ./results
