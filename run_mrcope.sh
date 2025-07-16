@@ -342,6 +342,27 @@ if [[ "$SENS_PANEL" == "y" ]]; then
   echo -e "${GRN}Panel complete. Results in $PANEL_LOG${NC}"
 fi
 
+# ------------------------ Confounder Keyword Input ------------------------
+
+echo ""
+echo -e "${GRN}🧠 Confounder Filtering with PhenoScanner${NC}"
+echo "--------------------------------------------------------"
+echo "👉 You can enter one or more keywords to RETAIN SNPs associated only with your exposure of interest."
+echo "   - Examples: smoking, alcohol, education, socioeconomic, physical activity"
+echo "   - Format:  Type keywords separated by commas (NO quotes or spaces)"
+echo "   - Case-insensitive; partial matches allowed"
+echo -e "   - ${YEL}⚠️  Leaving this blank disables confounder filtering entirely!${NC}"
+echo ""
+
+read -rp "📌 Enter confounder keyword(s) to retain (comma-separated): " TRAIT_KEYWORDS
+
+if [[ -z "$TRAIT_KEYWORDS" ]]; then
+  echo -e "${YEL}⚠️  No keywords entered. PhenoScanner confounder filtering will be skipped.${NC}"
+  TRAIT_KEYWORDS="."  # Placeholder to indicate 'skip'
+else
+  echo -e "${GRN}🎯 You entered keyword(s):${NC} ${TRAIT_KEYWORDS}"
+fi
+
 # -------------------- Print Summary Table Before Run -----------------------
 
 echo ""
@@ -380,6 +401,7 @@ CMD="$NF_CMD run main.nf -with-docker \"$IMAGE_NAME\" \
     --clump_kb \"$CLUMP_KB\" \
     --clump_r2 \"$CLUMP_R2\" \
     --ld_pop \"$LD_POP\" \
+    --trait_keyword \"$TRAIT_KEYWORDS\" \
     --output_dir \"./results\" \
     -resume"
 echo "$CMD" > ./results/mrcope_command.log
