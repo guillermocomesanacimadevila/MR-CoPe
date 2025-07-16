@@ -3,13 +3,15 @@
 nextflow.enable.dsl=2
 
 // ========================== PARAMETERS ==========================
-params.output_dir     = "./results"
-params.script_dir     = "./"
-params.log10_flag     = "n"              // Are input p-values already -log10(p)?
-params.clump_kb       = 10000            // LD window in kb
-params.clump_r2       = 0.001            // LD clumping threshold
-params.trait_keyword  = null             // Trait to retain (e.g., "CRP", "LDL")
-params.ld_pop         = "EUR"            // LD reference population (NEW PARAM ADDED)
+params.output_dir      = "./results"
+params.script_dir      = "./"
+params.log10_flag      = "n"                // Are input p-values already -log10(p)?
+params.clump_kb        = 10000              // LD window in kb
+params.clump_r2        = 0.001              // LD clumping threshold
+params.trait_keywords  = null               // Comma-separated keywords to retain (e.g., "smoking, alcohol")
+params.ld_pop          = "EUR"              // LD reference population
+params.exposure        = null
+params.outcome         = null
 
 // ========================== SCRIPTS ==========================
 workflow {
@@ -27,28 +29,36 @@ workflow {
     def exposure_file = file(params.exposure)
     def outcome_file  = file(params.outcome)
 
-    // Step 1: Exploratory analysis (manhattan + QQ)
+    // Step 1: Exploratory analysis
     exploratory_analysis(script_explore, exposure_file, outcome_file)
 
-    // Step 2: Preprocess GWAS (QC, merge, F-stat)
+    // Step 2: Preprocessing
     gwas_processing(script_process, exposure_file, outcome_file)
 
-    // Step 3: LD pruning (add LD pop as arg)
+    // Step 3: LD pruning
     ld_filtering(script_ld, gwas_processing.out.filtered)
 
-    // Step 4: Filter SNPs associated with confounding traits (PhenoScanner)
-    confounder_filtering(script_filter_conf, ld_filtering.out.pruned)
+    // Step 4: Conditional confounder filtering
+    def confounder_output
+
+    if (params.trait_keywords == null || params.trait_keywords == ".") {
+        skip_confounder_filtering(ld_filtering.out.pruned)
+        confounder_output = skip_confounder_filtering.out.filtered
+    } else {
+        confounder_filtering(script_filter_conf, ld_filtering.out.pruned)
+        confounder_output = confounder_filtering.out.filtered
+    }
 
     // Step 5: MR analysis
-    mr_analysis(script_mr, confounder_filtering.out.filtered)
+    mr_analysis(script_mr, confounder_output)
 
-    // Step 6a: MR summary visualisation
+    // Step 6a: Summary visualisation
     visualisation_summary(script_vis_sum, mr_analysis.out.summary, mr_analysis.out.snps)
 
-    // Step 6b: MR scatter plots + leave-one-out
+    // Step 6b: Scatter plots
     visualisation_scatter(script_vis_scatt, mr_analysis.out.harmonised)
 
-    // Step 7: Generate interactive HTML report
+    // Step 7: HTML report
     html_report(script_html_report, mr_analysis.out.summary, mr_analysis.out.snps, html_template)
 }
 
@@ -103,7 +113,6 @@ process ld_filtering {
 
     script:
     """
-    # --- PASS LD POP AS FINAL ARG (ADDED) ---
     Rscript ${script} ${filtered} ld_pruned_SNPs.csv ${params.clump_kb} ${params.clump_r2} ${params.ld_pop}
     """
 }
@@ -120,7 +129,22 @@ process confounder_filtering {
 
     script:
     """
-    Rscript ${script} ${pruned} confounder_filtered_SNPs.csv "${params.trait_keyword}"
+    Rscript ${script} ${pruned} confounder_filtered_SNPs.csv "${params.trait_keywords}"
+    """
+}
+
+process skip_confounder_filtering {
+    publishDir "${params.output_dir}", mode: 'copy', overwrite: true
+
+    input:
+    path pruned
+
+    output:
+    path("confounder_filtered_SNPs.csv"), emit: filtered
+
+    script:
+    """
+    cp ${pruned} confounder_filtered_SNPs.csv
     """
 }
 
