@@ -7,7 +7,7 @@ params.script_dir      = "./"
 params.log10_flag      = "n"                // Are input p-values already -log10(p)?
 params.clump_kb        = 10000              // LD window in kb
 params.clump_r2        = 0.001              // LD clumping threshold
-params.trait_keywords  = null               // Comma-separated keywords to retain (e.g., "smoking, alcohol")
+params.trait_keywords  = null               // Comma-separated keywords to retain
 params.ld_pop          = "EUR"              // LD reference population
 params.exposure        = null
 params.outcome         = null
@@ -22,7 +22,7 @@ workflow {
     def script_filter_conf = file("${params.script_dir}/04a_filter_confounders.R")
     def script_mr          = file("${params.script_dir}/04_mr_analyses.R")
     def script_vis_sum     = file("${params.script_dir}/05_visualisations.py")
-    def script_vis_scatt   = file("${params.script_dir}/06_visualisations.R")
+    def script_vis_scatt   = file("${params.script_dir}/06_mr_scatter_plots.R")
     def script_html_report = file("${params.script_dir}/07_generate_html_report.py")
     def html_template      = file("Frontend/style.html")
 
@@ -58,14 +58,17 @@ workflow {
     // Step 5: MR analysis
     mr_analysis(script_mr, confounder_output)
 
+    // Capture harmonised channel for later use
+    def harmonised_file = mr_analysis.out.harmonised
+
     // Step 6a: Summary visualisation
     visualisation_summary(script_vis_sum, mr_analysis.out.summary, mr_analysis.out.snps)
 
-    // Step 6b: Scatter plots
-    visualisation_scatter(script_vis_scatt, mr_analysis.out.harmonised)
+    // Step 6b: Static scatter/LOO figures
+    visualisation_scatter(script_vis_scatt, harmonised_file)
 
-    // Step 7: HTML report
-    html_report(script_html_report, mr_analysis.out.summary, mr_analysis.out.snps, html_template)
+    // Step 7: HTML report (07 expects exactly 4 args; harmonised is staged)
+    html_report(script_html_report, mr_analysis.out.summary, mr_analysis.out.snps, html_template, harmonised_file)
 }
 
 // ========================== PROCESSES ==========================
@@ -212,18 +215,19 @@ process visualisation_scatter {
     publishDir "${params.output_dir}", mode: 'copy', overwrite: true
 
     input:
-    path script
+    path script        // 06_mr_scatter_plots.R
     path harmonised
 
     output:
     path("MR_Scatter_IVW.png")
     path("MR_Scatter_Egger.png")
     path("MR_Scatter_WME.png")
+    path("MR_Scatter_Combined.png")
     path("MR_LeaveOneOut.png")
 
     script:
     """
-    # Write into work dir so Nextflow can capture declared outputs
+    # Use the staged script path — don't hardcode filenames
     Rscript ${script} ${harmonised} .
     """
 }
@@ -236,12 +240,15 @@ process html_report {
     path summary
     path snps
     path html_template
+    path harmonised
 
     output:
     path("MR_CoPe_Report.html")
 
     script:
     """
+    # harmonised_data.csv is already staged into the work dir, no need to copy
     python3 ${script} ${summary} ${snps} ${html_template} MR_CoPe_Report.html
     """
 }
+
