@@ -1,5 +1,4 @@
 #!/usr/bin/env nextflow
-
 nextflow.enable.dsl=2
 
 // ========================== PARAMETERS ==========================
@@ -12,8 +11,9 @@ params.trait_keywords  = null               // Comma-separated keywords to retai
 params.ld_pop          = "EUR"              // LD reference population
 params.exposure        = null
 params.outcome         = null
+params.skip_ld         = "n"                // Skip LD pruning? ("y" or "n")
 
-// ========================== SCRIPTS ==========================
+// ========================== WORKFLOW ==========================
 workflow {
 
     def script_explore     = file("${params.script_dir}/01_exploratory_analysis.py")
@@ -35,17 +35,23 @@ workflow {
     // Step 2: Preprocessing
     gwas_processing(script_process, exposure_file, outcome_file)
 
-    // Step 3: LD pruning
-    ld_filtering(script_ld, gwas_processing.out.filtered)
+    // =================== LD branch logic =======================
+    def snp_input
+    if (params.skip_ld == "y") {
+        skip_ld_pruning(gwas_processing.out.filtered)
+        snp_input = skip_ld_pruning.out.nold
+    } else {
+        ld_filtering(script_ld, gwas_processing.out.filtered)
+        snp_input = ld_filtering.out.pruned
+    }
 
-    // Step 4: Conditional confounder filtering
+    // ========== Confounder filtering logic ==========
     def confounder_output
-
     if (params.trait_keywords == null || params.trait_keywords == ".") {
-        skip_confounder_filtering(ld_filtering.out.pruned)
+        skip_confounder_filtering(snp_input)
         confounder_output = skip_confounder_filtering.out.filtered
     } else {
-        confounder_filtering(script_filter_conf, ld_filtering.out.pruned)
+        confounder_filtering(script_filter_conf, snp_input)
         confounder_output = confounder_filtering.out.filtered
     }
 
@@ -73,14 +79,15 @@ process exploratory_analysis {
     path outcome
 
     output:
-    path("${params.output_dir}/exposure_manhattan.png"), optional: true
-    path("${params.output_dir}/outcome_manhattan.png"), optional: true
-    path("${params.output_dir}/exposure_qq.png"), optional: true
-    path("${params.output_dir}/outcome_qq.png"), optional: true
+    path("exposure_manhattan.png"), optional: true
+    path("outcome_manhattan.png"),  optional: true
+    path("exposure_qq.png"),        optional: true
+    path("outcome_qq.png"),         optional: true
 
     script:
     """
-    python3 ${script} ${exposure} ${outcome} ${params.output_dir} ${params.log10_flag}
+    # Write plots into the task work dir; publishDir will copy them
+    python3 ${script} ${exposure} ${outcome} . ${params.log10_flag}
     """
 }
 
@@ -114,6 +121,21 @@ process ld_filtering {
     script:
     """
     Rscript ${script} ${filtered} ld_pruned_SNPs.csv ${params.clump_kb} ${params.clump_r2} ${params.ld_pop}
+    """
+}
+
+process skip_ld_pruning {
+    publishDir "${params.output_dir}", mode: 'copy', overwrite: true
+
+    input:
+    path filtered
+
+    output:
+    path("ld_pruned_SNPs.csv"), emit: nold
+
+    script:
+    """
+    cp ${filtered} ld_pruned_SNPs.csv
     """
 }
 
@@ -157,8 +179,8 @@ process mr_analysis {
 
     output:
     path("MR_Formatted_Results.csv"), emit: summary
-    path("MR_IVW_OR_Per_SNP.csv"), emit: snps
-    path("harmonised_data.csv"), emit: harmonised
+    path("MR_IVW_OR_Per_SNP.csv"),    emit: snps
+    path("harmonised_data.csv"),      emit: harmonised
 
     script:
     """
@@ -181,7 +203,8 @@ process visualisation_summary {
 
     script:
     """
-    python3 ${script} ${summary} ${snps} ${params.output_dir}
+    # Write into work dir so Nextflow can capture declared outputs
+    python3 ${script} ${summary} ${snps} .
     """
 }
 
@@ -200,7 +223,8 @@ process visualisation_scatter {
 
     script:
     """
-    Rscript ${script} ${harmonised} ${params.output_dir}
+    # Write into work dir so Nextflow can capture declared outputs
+    Rscript ${script} ${harmonised} .
     """
 }
 
