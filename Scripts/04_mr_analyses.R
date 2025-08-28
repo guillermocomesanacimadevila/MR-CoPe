@@ -22,15 +22,11 @@
 
 # ---- Required Libraries (with auto-install) ----
 install_if_missing <- function(pkg, repo = "https://cloud.r-project.org") {
-  if (!requireNamespace(pkg, quietly = TRUE)) {
-    install.packages(pkg, repos = repo)
-  }
+  if (!requireNamespace(pkg, quietly = TRUE)) install.packages(pkg, repos = repo)
 }
-
-install_if_missing("nloptr")
-install_if_missing("lme4")
-install_if_missing("meta")
-install_if_missing("remotes")
+install_if_missing("nloptr"); install_if_missing("lme4"); install_if_missing("meta")
+install_if_missing("remotes"); install_if_missing("dplyr"); install_if_missing("readr")
+install_if_missing("tibble");  install_if_missing("tidyr")
 
 if (!requireNamespace("TwoSampleMR", quietly = TRUE)) {
   remotes::install_github("MRCIEU/TwoSampleMR", upgrade = "never", lib = .libPaths()[1])
@@ -38,170 +34,190 @@ if (!requireNamespace("TwoSampleMR", quietly = TRUE)) {
 
 suppressPackageStartupMessages({
   library(TwoSampleMR)
-  library(tidyverse)
-  library(optparse)
+  library(dplyr)
+  library(readr)
+  library(tibble)
+  library(tidyr)
 })
 
-# ---- Handle Arguments ----
+# ---- args ----
 args <- commandArgs(trailingOnly = TRUE)
-
-if (length(args) != 1) {
-  stop("Usage: Rscript 04_mr_analyses.R <input_ld_pruned_snps.csv>")
-}
-
+if (length(args) != 1) stop("Usage: Rscript 04_mr_analyses.R <input_ld_pruned_snps.csv>")
 input_file <- args[1]
 
 cat("\n==============================================================\n")
 cat("MR-CoPe | Mendelian Randomisation Analysis\n")
 cat("==============================================================\n\n")
 
+# ---- guard empty ----
 if (!file.exists(input_file) || file.info(input_file)$size == 0) {
-  cat("❌ ERROR: Input file is missing or empty — no SNPs passed LD pruning.\n")
-  cat("🛑 Skipping MR analysis step.\n")
-
+  cat("❌ Input missing/empty — skipping MR.\n")
   empty_df <- data.frame()
   write.csv(empty_df, "MR_Formatted_Results.csv", row.names = FALSE)
   write.csv(empty_df, "MR_IVW_OR_Per_SNP.csv", row.names = FALSE)
   write.csv(empty_df, "exposure_dat.csv", row.names = FALSE)
   write.csv(empty_df, "outcome_dat.csv", row.names = FALSE)
   write.csv(empty_df, "harmonised_data.csv", row.names = FALSE)
-
   quit(status = 0)
 }
 
 cat("📥 Loading input file:", input_file, "\n")
-filtered_snps <- read.csv(input_file)
-cat("📊 SNPs in analysis:", nrow(filtered_snps), "\n\n")
+dat <- suppressMessages(read_csv(input_file, show_col_types = FALSE))
+names(dat) <- toupper(gsub("\\s+", "", names(dat)))
+cat("📊 SNPs in analysis:", nrow(dat), "\n\n")
+cat("🧾 Columns:\n"); print(names(dat))
 
-colnames(filtered_snps) <- gsub("\\s+", "", colnames(filtered_snps))
+# ---- required columns ----
+req <- c("SNP","BETA_EXP","SE_EXP","PVALUE_EXP","BETA_OUT","SE_OUT","PVALUE_OUT")
+miss <- setdiff(req, names(dat))
+if (length(miss)) stop(paste0("❌ Missing required columns: ", paste(miss, collapse = ", ")))
 
-cat("🧾 Columns available in merged dataset:\n")
-print(colnames(filtered_snps))
+# ---- EAF mapping (be tolerant if absent) ----
+if (!"EAF" %in% names(dat))          dat[["EAF"]] <- if ("EAF_EXP" %in% names(dat)) dat[["EAF_EXP"]] else NA_real_
+if (!"EAF.OUTCOME" %in% names(dat))  dat[["EAF.OUTCOME"]] <- if ("EAF_OUT" %in% names(dat)) dat[["EAF_OUT"]] else NA_real_
 
-# ---- Fallback Renaming for EAF ----
-if (!"eaf" %in% names(filtered_snps)) {
-  eaf_candidates <- c("EAF_exp", "effect_allele_freq", "eaf_exposure")
-  existing <- intersect(eaf_candidates, names(filtered_snps))
-  if (length(existing) > 0) {
-    names(filtered_snps)[names(filtered_snps) == existing[1]] <- "eaf"
-  } else {
-    stop("❌ Could not find a column to map as 'eaf'.")
-  }
+# ---- allele names for harmonisation ----
+if (all(c("A1_EXP","A2_EXP","A1_OUT","A2_OUT") %in% names(dat))) {
+  dat <- dat %>%
+    rename(effect_allele = A1_EXP,
+           other_allele = A2_EXP,
+           `effect_allele.outcome` = A1_OUT,
+           `other_allele.outcome`  = A2_OUT)
+  cat("🔄 Renamed allele columns for harmonisation.\n\n")
+} else {
+  cat("⚠️  A1/A2 columns not fully present; proceeding anyway.\n\n")
 }
 
-if (!"eaf.outcome" %in% names(filtered_snps)) {
-  eaf_out_candidates <- c("EAF_out", "effect_allele_freq.outcome", "eaf_outcome")
-  existing_out <- intersect(eaf_out_candidates, names(filtered_snps))
-  if (length(existing_out) > 0) {
-    names(filtered_snps)[names(filtered_snps) == existing_out[1]] <- "eaf.outcome"
-  } else {
-    stop("❌ Could not find a column to map as 'eaf.outcome'.")
-  }
-}
+# ---- build exposure/outcome tables ----
+exposure_dat <- dat %>%
+  select(SNP,
+         beta = BETA_EXP, se = SE_EXP, pval = PVALUE_EXP,
+         eaf = EAF, effect_allele, other_allele) %>%
+  drop_na(SNP, beta, se, pval)
 
-# ---- Rename for harmonisation ----
-rename_cols <- c(
-  A1_exp = "effect_allele",
-  A2_exp = "other_allele",
-  A1_out = "effect_allele.outcome",
-  A2_out = "other_allele.outcome"
-)
-filtered_snps <- filtered_snps %>% rename(any_of(rename_cols))
-
-cat("🔄 Renamed: a1_exp → effect_allele \n")
-cat("🔄 Renamed: a2_exp → other_allele \n")
-cat("🔄 Renamed: a1_out → effect_allele.outcome \n")
-cat("🔄 Renamed: a2_out → other_allele.outcome \n\n")
-
-# ---- Exposure Dataset ----
-exposure_dat <- filtered_snps %>%
-  select(SNP, beta = BETA_exp, se = SE_exp, pval = PVALUE_exp,
-         eaf, effect_allele, other_allele) %>%
-  drop_na()
+outcome_dat <- dat %>%
+  select(SNP,
+         beta = BETA_OUT, se = SE_OUT, pval = PVALUE_OUT,
+         eaf = `EAF.OUTCOME`,
+         effect_allele = `effect_allele.outcome`,
+         other_allele  = `other_allele.outcome`) %>%
+  drop_na(SNP, beta, se, pval)
 
 write.csv(exposure_dat, "exposure_dat.csv", row.names = FALSE)
+write.csv(outcome_dat,  "outcome_dat.csv",  row.names = FALSE)
 
-# ---- Outcome Dataset ----
-outcome_dat <- filtered_snps %>%
-  select(SNP, beta = BETA_out, se = SE_out, pval = PVALUE_out,
-         eaf = eaf.outcome, effect_allele = effect_allele.outcome,
-         other_allele = other_allele.outcome) %>%
-  drop_na()
+# ---- harmonise ----
+exposure_dat  <- format_data(exposure_dat, type = "exposure")
+outcome_dat   <- format_data(outcome_dat,  type = "outcome")
+harm <- harmonise_data(exposure_dat, outcome_dat, action = 2)
+write.csv(harm, "harmonised_data.csv", row.names = FALSE)
 
-write.csv(outcome_dat, "outcome_dat.csv", row.names = FALSE)
-
-# ---- Format & Harmonise ----
-exposure_dat <- format_data(exposure_dat, type = "exposure")
-outcome_dat <- format_data(outcome_dat, type = "outcome")
-
-harmonised_data <- harmonise_data(exposure_dat, outcome_dat, action = 2)
-write.csv(harmonised_data, "harmonised_data.csv", row.names = FALSE)
-
-cat("📊 SNPs after harmonisation:", nrow(harmonised_data), "\n\n")
-
-if (nrow(harmonised_data) == 0) {
-  cat("❌ No data available for MR analysis after filtering. Check SNP overlap and F-stat filtering.\n")
+cat("📊 SNPs after harmonisation:", nrow(harm), "\n\n")
+if (nrow(harm) == 0) {
+  cat("❌ No data after harmonisation — stopping.\n")
   empty_df <- data.frame()
   write.csv(empty_df, "MR_Formatted_Results.csv", row.names = FALSE)
   write.csv(empty_df, "MR_IVW_OR_Per_SNP.csv", row.names = FALSE)
   quit(status = 0)
 }
 
-# ---- MR Analysis ----
-cat("⚙️ Running MR methods...\n")
+# ---- MR main methods ----
+cat("⚙️ Running MR methods (IVW, Egger, Weighted Median)...\n")
 methods <- c("mr_ivw", "mr_egger_regression", "mr_weighted_median")
-results_df <- mr(harmonised_data, method_list = methods)
+res_df <- mr(harm, method_list = methods)
+het    <- mr_heterogeneity(harm)
+pleio  <- mr_pleiotropy_test(harm)
 
-# ---- Sensitivity ----
-heterogeneity <- mr_heterogeneity(harmonised_data)
-pleiotropy <- mr_pleiotropy_test(harmonised_data)
+# ---- Per-SNP ORs (robust block) ----
+per_snp_or <- NULL
+ok <- TRUE
+snp_try <- try(mr_singlesnp(harm), silent = TRUE)
+if (!inherits(snp_try, "try-error") && is.data.frame(snp_try) && "SNP" %in% names(snp_try)) {
+  if ("b" %in% names(snp_try) && "se" %in% names(snp_try)) {
+    keep_idx <- rep(TRUE, nrow(snp_try))
+    if ("method" %in% names(snp_try)) keep_idx <- grepl("Wald", snp_try$method, ignore.case = TRUE)
+    snp_sub <- snp_try[keep_idx, , drop = FALSE]
+    per_snp_or <- tibble(
+      SNP          = snp_sub$SNP,
+      IVW_OR       = exp(snp_sub$b),
+      IVW_Lower_95 = exp(snp_sub$b + qnorm(0.025) * snp_sub$se),
+      IVW_Upper_95 = exp(snp_sub$b + qnorm(0.975) * snp_sub$se)
+    )
+  } else ok <- FALSE
+} else ok <- FALSE
 
-# ---- Per-SNP OR ----
-IVW_SNP_results <- data.frame(
-  SNP = harmonised_data$SNP,
-  IVW_OR = exp(harmonised_data$beta.exposure / harmonised_data$se.exposure),
-  IVW_Lower_95 = exp((harmonised_data$beta.exposure - 1.96 * harmonised_data$se.exposure) / harmonised_data$se.exposure),
-  IVW_Upper_95 = exp((harmonised_data$beta.exposure + 1.96 * harmonised_data$se.exposure) / harmonised_data$se.exposure)
-)
-write.csv(IVW_SNP_results, "MR_IVW_OR_Per_SNP.csv", row.names = FALSE)
+if (!ok) {
+  # Manual Wald ratio per SNP (delta-method SE)
+  eps <- 1e-12
+  hd <- harm %>%
+    transmute(
+      SNP,
+      be = beta.exposure,
+      se_be = se.exposure,
+      bo = beta.outcome,
+      se_bo = se.outcome
+    ) %>%
+    filter(is.finite(be), abs(be) > eps,
+           is.finite(se_be), is.finite(bo), is.finite(se_bo))
 
-# ---- Summary ----
+  b  <- hd$bo / hd$be
+  # FIXED LINE (balanced parentheses):
+  se <- sqrt((hd$se_bo^2 / (hd$be^2)) + ((hd$bo^2) * (hd$se_be^2) / (hd$be^4)))
+
+  per_snp_or <- tibble(
+    SNP          = hd$SNP,
+    IVW_OR       = exp(b),
+    IVW_Lower_95 = exp(b + qnorm(0.025) * se),
+    IVW_Upper_95 = exp(b + qnorm(0.975) * se)
+  )
+}
+write.csv(per_snp_or, "MR_IVW_OR_Per_SNP.csv", row.names = FALSE)
+
+# ---- Summary table ----
+get_row <- function(d, m) d %>% filter(method == m)
+safe_exp <- function(x) if (!length(x)) NA_real_ else exp(x)
+safe_ci  <- function(b, se) if (!length(b) || !length(se)) c(NA_real_, NA_real_) else c(b + qnorm(.025)*se, b + qnorm(.975)*se)
+
+ivw   <- get_row(res_df, "Inverse variance weighted")
+wm    <- get_row(res_df, "Weighted median")
+egger <- get_row(res_df, "MR Egger")
+
+ivw_ci   <- safe_ci(ivw$b, ivw$se)
+wm_ci    <- safe_ci(wm$b,  wm$se)
+egger_ci <- safe_ci(egger$b, egger$se)
+
 results <- tibble(
-  N_SNPs = nrow(harmonised_data),
+  N_SNPs = nrow(harm),
 
-  IVW_OR = results_df %>% filter(method == "Inverse variance weighted") %>% pull(b) %>% exp(),
-  IVW_CI_Lower = results_df %>% filter(method == "Inverse variance weighted") %>%
-    mutate(lower = b + qnorm(.025) * se) %>% pull(lower) %>% exp(),
-  IVW_CI_Upper = results_df %>% filter(method == "Inverse variance weighted") %>%
-    mutate(upper = b + qnorm(.975) * se) %>% pull(upper) %>% exp(),
-  IVW_Pval = results_df %>% filter(method == "Inverse variance weighted") %>% pull(pval),
+  IVW_OR       = safe_exp(ivw$b),
+  IVW_CI_Lower = safe_exp(ivw_ci[1]),
+  IVW_CI_Upper = safe_exp(ivw_ci[2]),
+  IVW_Pval     = if (nrow(ivw)) ivw$pval else NA_real_,
 
-  WM_OR = results_df %>% filter(method == "Weighted median") %>% pull(b) %>% exp(),
-  WM_CI_Lower = results_df %>% filter(method == "Weighted median") %>%
-    mutate(lower = b + qnorm(.025) * se) %>% pull(lower) %>% exp(),
-  WM_CI_Upper = results_df %>% filter(method == "Weighted median") %>%
-    mutate(upper = b + qnorm(.975) * se) %>% pull(upper) %>% exp(),
-  WM_Pval = results_df %>% filter(method == "Weighted median") %>% pull(pval),
+  WM_OR        = safe_exp(wm$b),
+  WM_CI_Lower  = safe_exp(wm_ci[1]),
+  WM_CI_Upper  = safe_exp(wm_ci[2]),
+  WM_Pval      = if (nrow(wm)) wm$pval else NA_real_,
 
-  Egger_OR = results_df %>% filter(method == "MR Egger") %>% pull(b) %>% exp(),
-  Egger_CI_Lower = results_df %>% filter(method == "MR Egger") %>%
-    mutate(lower = b + qnorm(.025) * se) %>% pull(lower) %>% exp(),
-  Egger_CI_Upper = results_df %>% filter(method == "MR Egger") %>%
-    mutate(upper = b + qnorm(.975) * se) %>% pull(upper) %>% exp(),
-  Egger_Pval = results_df %>% filter(method == "MR Egger") %>% pull(pval),
+  Egger_OR       = safe_exp(egger$b),
+  Egger_CI_Lower = safe_exp(egger_ci[1]),
+  Egger_CI_Upper = safe_exp(egger_ci[2]),
+  Egger_Pval     = if (nrow(egger)) egger$pval else NA_real_,
 
-  Egger_Intercept_Pval = pleiotropy$pval,
-  IVW_Het_Q_Pval = heterogeneity$Q_pval[heterogeneity$method == "Inverse variance weighted"],
-  I2_Statistic = heterogeneity$I2[heterogeneity$method == "Inverse variance weighted"]
+  Egger_Intercept_Pval = if (!is.null(pleio$pval)) pleio$pval else NA_real_,
+  IVW_Het_Q_Pval = {
+    hv <- het %>% filter(method == "Inverse variance weighted")
+    if (nrow(hv)) hv$Q_pval else NA_real_
+  },
+  I2_Statistic = {
+    hv <- het %>% filter(method == "Inverse variance weighted")
+    if (nrow(hv)) hv$I2 else NA_real_
+  }
 )
 
 write.csv(results, "MR_Formatted_Results.csv", row.names = FALSE)
 
 cat("✅ MR analysis completed successfully!\n")
-cat("📝 Outputs generated:\n")
-cat("- exposure_dat.csv\n")
-cat("- outcome_dat.csv\n")
-cat("- harmonised_data.csv\n")
-cat("- MR_Formatted_Results.csv\n")
-cat("- MR_IVW_OR_Per_SNP.csv\n")
+cat("📝 Outputs:\n")
+cat("- exposure_dat.csv\n- outcome_dat.csv\n- harmonised_data.csv\n- MR_Formatted_Results.csv\n- MR_IVW_OR_Per_SNP.csv\n")
 cat("==============================================================\n\n")
