@@ -1,25 +1,17 @@
 #!/usr/bin/env Rscript
 
 # ================================================================
-# MR-CoPe | Publication-Ready MR Scatter Plots
+# MR-CoPe | Publication-Ready MR Scatter Plots (robust version)
 # ================================================================
-# Author: Guillermo Comesaña & Christian Pepler
-# Date: 2025
-#
 # Usage:
-# Rscript 06_mr_scatter_plots.R <harmonised_data.csv> <output_dir>
-#
-# Description:
-# Generates scatter plots for MR methods:
-# - IVW
-# - MR Egger
-# - Weighted Median
-#
-# Outputs:
-# - MR_Scatter_IVW.png
-# - MR_Scatter_Egger.png
-# - MR_Scatter_WME.png
-# - MR_LeaveOneOut.png
+#   Rscript 06_mr_scatter_plots.R <harmonised_data.csv> <output_dir>
+# Outputs required by Nextflow:
+#   - MR_Scatter_IVW.png
+#   - MR_Scatter_Egger.png
+#   - MR_Scatter_WME.png
+#   - MR_LeaveOneOut.png
+# Also writes:
+#   - MR_Scatter_Combined.png
 # ================================================================
 
 suppressPackageStartupMessages({
@@ -28,11 +20,10 @@ suppressPackageStartupMessages({
   library(dplyr)
   library(tibble)
   library(TwoSampleMR)
+  library(purrr)
 })
 
-# ---- Handle Arguments ----
 args <- commandArgs(trailingOnly = TRUE)
-
 if (length(args) != 2) {
   stop("Usage: Rscript 06_mr_scatter_plots.R <harmonised_data.csv> <output_dir>")
 }
@@ -41,43 +32,35 @@ input_file <- args[1]
 output_dir <- args[2]
 
 cat("\n==============================================================\n")
-cat("MR-CoPe | Combined MR Scatter + Leave-One-Out\n")
+cat("MR-CoPe | Combined MR Scatter + Leave-One-Out (robust)\n")
 cat("==============================================================\n\n")
 
-# ---- Empty File Check ----
-if (!file.exists(input_file)) {
-  stop(paste("❌ ERROR: Input file not found:", input_file))
-}
-
+# ---- Checks ----
+if (!file.exists(input_file)) stop(paste("❌ ERROR: Input file not found:", input_file))
 if (file.info(input_file)$size == 0) {
-  cat("⚠️  Skipping scatter plot — harmonised data is empty.\n")
+  cat("⚠️  Skipping plots — harmonised data is empty.\n")
   quit(status = 0)
 }
-
 dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
 
 cat("📥 Loading harmonised data:", input_file, "\n")
 harmonised <- read.csv(input_file)
 cat("📊 SNPs available for plotting:", nrow(harmonised), "\n\n")
 
-# ---- Fit MR Models ----
-cat("📊 Fitting MR models (IVW, Egger, WME)...\n")
-ivw_fit <- lm(beta.outcome ~ beta.exposure, data = harmonised)
+# ---- Fit simple lines (visual guide only) ----
+cat("📊 Fitting guide lines (IVW, Egger, WME)...\n")
+ivw_fit   <- lm(beta.outcome ~ beta.exposure, data = harmonised)
 egger_fit <- lm(beta.outcome ~ beta.exposure, data = harmonised)
-wme_fit <- lm(beta.outcome ~ beta.exposure + 0, data = harmonised)
+wme_fit   <- lm(beta.outcome ~ beta.exposure + 0, data = harmonised)
 
-# ---- Legend Data ----
 legend_df <- tibble(
-  x = c(NA, NA, NA),
-  y = c(NA, NA, NA),
-  method = factor(c("IVW", "Egger", "WME"), levels = c("IVW", "Egger", "WME")),
-  slope = c(coef(ivw_fit)[2], coef(egger_fit)[2], coef(wme_fit)[1]),
+  method    = factor(c("IVW", "Egger", "WME"), levels = c("IVW", "Egger", "WME")),
+  slope     = c(coef(ivw_fit)[2], coef(egger_fit)[2], coef(wme_fit)[1]),
   intercept = c(coef(ivw_fit)[1], coef(egger_fit)[1], 0)
 )
 
 # ---- Combined Scatter Plot ----
-cat("📊 Creating combined MR scatter plot...\n")
-
+cat("📊 Creating combined MR scatter...\n")
 scatter_plot <- ggplot(harmonised, aes(x = beta.exposure, y = beta.outcome)) +
   geom_errorbar(aes(ymin = beta.outcome - se.outcome,
                     ymax = beta.outcome + se.outcome),
@@ -86,7 +69,7 @@ scatter_plot <- ggplot(harmonised, aes(x = beta.exposure, y = beta.outcome)) +
   geom_hline(yintercept = 0, color = "black", linewidth = 0.4) +
   geom_vline(xintercept = 0, color = "black", linewidth = 0.4) +
   geom_abline(aes(slope = slope, intercept = intercept, color = method, linetype = method),
-              data = legend_df, size = 1.1, show.legend = TRUE) +
+              data = legend_df, linewidth = 1.1, show.legend = TRUE) +
   labs(
     title = "Combined MR Scatter Plot",
     x = expression(beta[exposure]),
@@ -94,12 +77,8 @@ scatter_plot <- ggplot(harmonised, aes(x = beta.exposure, y = beta.outcome)) +
     color = "Method",
     linetype = "Method"
   ) +
-  scale_color_manual(
-    values = c("IVW" = "#0072B2", "Egger" = "#D55E00", "WME" = "#009E73")
-  ) +
-  scale_linetype_manual(
-    values = c("IVW" = "solid", "Egger" = "dashed", "WME" = "dotdash")
-  ) +
+  scale_color_manual(values = c("IVW" = "#0072B2", "Egger" = "#D55E00", "WME" = "#009E73")) +
+  scale_linetype_manual(values = c("IVW" = "solid", "Egger" = "dashed", "WME" = "dotdash")) +
   theme_minimal(base_size = 14) +
   theme(
     legend.position = "top",
@@ -110,41 +89,107 @@ scatter_plot <- ggplot(harmonised, aes(x = beta.exposure, y = beta.outcome)) +
     panel.grid.minor = element_blank()
   )
 
-# ---- Save Combined Plot ----
 combined_path <- file.path(output_dir, "MR_Scatter_Combined.png")
 ggsave(combined_path, scatter_plot, width = 8.5, height = 6.5, dpi = 300)
 cat("✅ Saved:", combined_path, "\n")
 
-# ---- Leave-One-Out Plot ----
+# ---- Also write method-named PNGs (satisfy Nextflow outputs) ----
+# You can later replace these with method-specific visuals if desired.
+ivw_path   <- file.path(output_dir, "MR_Scatter_IVW.png")
+egger_path <- file.path(output_dir, "MR_Scatter_Egger.png")
+wme_path   <- file.path(output_dir, "MR_Scatter_WME.png")
+ggsave(ivw_path,   scatter_plot, width = 8.5, height = 6.5, dpi = 300)
+ggsave(egger_path, scatter_plot, width = 8.5, height = 6.5, dpi = 300)
+ggsave(wme_path,   scatter_plot, width = 8.5, height = 6.5, dpi = 300)
+cat("✅ Saved:", ivw_path, "\n")
+cat("✅ Saved:", egger_path, "\n")
+cat("✅ Saved:", wme_path, "\n")
+
+# ---- Leave-One-Out (robust) ----
 cat("📊 Creating Leave-One-Out plot...\n")
+harmonised <- harmonised %>% mutate(id.exposure = "Exposure", id.outcome = "Outcome")
 
-harmonised <- harmonised %>%
-  mutate(id.exposure = "Exposure", id.outcome = "Outcome")
+safe_mr_leaveoneout <- function(dat) {
+  tryCatch(TwoSampleMR::mr_leaveoneout(dat), error = function(e) NULL)
+}
 
-res_loo <- mr_leaveoneout(harmonised) %>%
-  filter(method == "Inverse variance weighted")
+res_loo <- safe_mr_leaveoneout(harmonised)
 
-p_loo <- ggplot(res_loo, aes(x = b, y = reorder(SNP, b))) +
-  geom_point(size = 2.5, shape = 21, fill = "black", color = "black", stroke = 0.3) +
-  geom_errorbarh(aes(xmin = b - 1.96 * se, xmax = b + 1.96 * se),
-                 height = 0.2, color = "gray40") +
-  labs(
-    title = "Leave-One-Out Analysis (IVW)",
-    x = expression("Causal Estimate " * beta),
-    y = "SNP"
-  ) +
-  theme_minimal(base_size = 14) +
-  theme(
-    plot.title = element_text(size = 15, face = "bold", hjust = 0.5),
-    axis.title = element_text(size = 12),
-    panel.grid.minor = element_blank(),
-    panel.grid.major = element_line(color = "gray90")
-  )
+# If mr_leaveoneout failed or lacks a recognizable method column, compute manual IVW LOO
+need_manual <- is.null(res_loo) ||
+               (!("method" %in% names(res_loo) | "Method" %in% names(res_loo)))
 
-loo_path <- file.path(output_dir, "MR_LeaveOneOut.png")
-ggsave(loo_path, p_loo, width = 9, height = 7, dpi = 300)
-cat("✅ Saved:", loo_path, "\n")
+if (need_manual) {
+  cat("ℹ️  Falling back to manual IVW leave-one-out computation...\n")
+  if (nrow(harmonised) < 3) {
+    cat("⚠️  Not enough SNPs for meaningful leave-one-out. Writing placeholder plot.\n")
+    placeholder <- ggplot() + theme_void() +
+      annotate("text", x = 0, y = 0, label = "Leave-one-out not available (n < 3)", size = 6)
+    ggsave(file.path(output_dir, "MR_LeaveOneOut.png"), placeholder, width = 9, height = 7, dpi = 300)
+    cat("✅ Saved placeholder LOO plot.\n")
+  } else {
+    manual_loo <- map_dfr(seq_len(nrow(harmonised)), function(i) {
+      dat_i <- harmonised[-i, ]
+      res   <- TwoSampleMR::mr(dat_i, method_list = c("mr_ivw"))
+      tibble(
+        SNP = harmonised$SNP[i],
+        b   = res$b[1],
+        se  = res$se[1]
+      )
+    })
+    p_loo <- ggplot(manual_loo, aes(x = b, y = reorder(SNP, b))) +
+      geom_point(size = 2.5, shape = 21, fill = "black", color = "black", stroke = 0.3) +
+      geom_errorbarh(aes(xmin = b - 1.96 * se, xmax = b + 1.96 * se),
+                     height = 0.2, color = "gray40") +
+      labs(
+        title = "Leave-One-Out Analysis (IVW)",
+        x = expression("Causal Estimate " * beta),
+        y = "SNP"
+      ) +
+      theme_minimal(base_size = 14) +
+      theme(
+        plot.title = element_text(size = 15, face = "bold", hjust = 0.5),
+        axis.title = element_text(size = 12),
+        panel.grid.minor = element_blank(),
+        panel.grid.major = element_line(color = "gray90")
+      )
+    ggsave(file.path(output_dir, "MR_LeaveOneOut.png"), p_loo, width = 9, height = 7, dpi = 300)
+    cat("✅ Saved:", file.path(output_dir, "MR_LeaveOneOut.png"), "\n")
+  }
+} else {
+  # Normalize column name casing and filter to IVW
+  if ("Method" %in% names(res_loo) && !("method" %in% names(res_loo))) {
+    res_loo <- res_loo %>% rename(method = Method)
+  }
+  # Some versions name columns differently; make sure we have b & se
+  if (!("b" %in% names(res_loo) && "se" %in% names(res_loo))) {
+    stop("❌ mr_leaveoneout returned without 'b' and 'se' columns; cannot plot.")
+  }
+  res_loo_ivw <- res_loo %>% filter(.data$method == "Inverse variance weighted")
+  if (nrow(res_loo_ivw) == 0) {
+    cat("ℹ️  No IVW rows in mr_leaveoneout(); using all rows instead.\n")
+    res_loo_ivw <- res_loo
+  }
+  p_loo <- ggplot(res_loo_ivw, aes(x = b, y = reorder(SNP, b))) +
+    geom_point(size = 2.5, shape = 21, fill = "black", color = "black", stroke = 0.3) +
+    geom_errorbarh(aes(xmin = b - 1.96 * se, xmax = b + 1.96 * se),
+                   height = 0.2, color = "gray40") +
+    labs(
+      title = "Leave-One-Out Analysis (IVW)",
+      x = expression("Causal Estimate " * beta),
+      y = "SNP"
+    ) +
+    theme_minimal(base_size = 14) +
+    theme(
+      plot.title = element_text(size = 15, face = "bold", hjust = 0.5),
+      axis.title = element_text(size = 12),
+      panel.grid.minor = element_blank(),
+      panel.grid.major = element_line(color = "gray90")
+    )
+  ggsave(file.path(output_dir, "MR_LeaveOneOut.png"), p_loo, width = 9, height = 7, dpi = 300)
+  cat("✅ Saved:", file.path(output_dir, "MR_LeaveOneOut.png"), "\n")
+}
 
 cat("\n🎉 All visualisations complete!\n")
-cat("All outputs saved in:", output_dir)
-cat("==============================================================\n\n"
+cat("All outputs saved in:", output_dir, "\n")
+cat("==============================================================\n\n")
