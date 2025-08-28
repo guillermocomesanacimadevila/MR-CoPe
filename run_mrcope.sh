@@ -10,6 +10,7 @@
 #   This script launches the MR-CoPe pipeline using Docker and Nextflow.
 #   It checks if Docker is running and starts it if needed.
 #   It also checks/loads or installs Nextflow before running the main workflow.
+#   + fzf integration for interactive file selection (optional).
 ###############################################################################
 
 set -e  # Exit on any error
@@ -20,7 +21,9 @@ GRN='\033[0;32m'
 YEL='\033[1;33m'
 NC='\033[0m' # No Color
 
-# --- Trap to handle exit, Ctrl+C, cleanup, etc ---
+# Debug toggle (set MRCOPE_DEBUG=1 in your env to see extra info)
+: "${MRCOPE_DEBUG:=0}"
+
 cleanup() {
   echo -e "\n${RED}🛑 Pipeline interrupted or failed. Exiting...${NC}"
   echo -e "${YEL}💡 You can resume where you left off by running this script again (Nextflow will pick up from the last successful step).${NC}"
@@ -32,22 +35,37 @@ echo ""
 echo -e "${GRN}🧬 Welcome to MR-CoPe: Mendelian Randomisation Pipeline${NC}"
 echo "--------------------------------------------------------"
 
-# --- Detect and enforce running from script dir (avoids path confusion) ---
+# --- Enforce running from script dir ---
 MYDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ "$PWD" != "$MYDIR" ]]; then
   echo -e "${YEL}⚠️  Please run this script from its own directory: $MYDIR${NC}"
   exit 1
 fi
 
-# --- Version info (from VERSION file or git) ---
+# --- Version info ---
 if [[ -f VERSION ]]; then
   VERSION=$(cat VERSION)
-elif git rev-parse --short HEAD 2>/dev/null; then
+elif git rev-parse --short HEAD >/dev/null 2>&1; then
   VERSION=$(git rev-parse --short HEAD)
 else
   VERSION="(unknown)"
 fi
 echo -e "${GRN}MR-CoPe Version: $VERSION${NC}"
+
+# --- Data root detection: prefer ./Data in repo, then /Data, else current dir ---
+if [ -n "${DATA_DIR:-}" ]; then
+  : # respect user override
+elif [ -d "./Data" ]; then
+  DATA_DIR="./Data"
+elif [ -d "/Data" ]; then
+  DATA_DIR="/Data"
+else
+  DATA_DIR="."
+fi
+echo -e "${YEL}🔎 Searching for inputs under: ${DATA_DIR}${NC}"
+
+# Force vertical list + border consistently (single definition)
+export FZF_DEFAULT_OPTS="--layout=default --border ${FZF_DEFAULT_OPTS}"
 
 ###############################################################################
 #                  TOOLCHAIN CHECK AND AUTO-INSTALL SECTION                   #
@@ -60,7 +78,7 @@ if ! command -v docker &> /dev/null; then
     install_msg "Docker not found. Attempting to install Docker..."
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
         curl -fsSL https://get.docker.com | sudo bash || { echo -e "${RED}❌ Failed to install Docker. Install manually.${NC}"; exit 1; }
-        sudo usermod -aG docker $USER
+        sudo usermod -aG docker "$USER" || true
         echo -e "${YEL}⚠️  Please log out and log back in for Docker permissions to update.${NC}"
     elif [[ "$OSTYPE" == "darwin"* ]]; then
         if command -v brew &> /dev/null; then
@@ -86,7 +104,7 @@ if ! command -v java &> /dev/null; then
     elif [[ "$OSTYPE" == "darwin"* ]]; then
         if command -v brew &> /dev/null; then
             brew install openjdk@11 || { echo -e "${RED}❌ Failed to install Java (brew). Install manually.${NC}"; exit 1; }
-            sudo ln -sfn /usr/local/opt/openjdk@11/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-11.jdk
+            sudo ln -sfn /usr/local/opt/openjdk@11/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-11.jdk || true
             export PATH="/usr/local/opt/openjdk@11/bin:$PATH"
         else
             echo -e "${RED}❌ Homebrew not found. Install Homebrew or Java manually.${NC}"
@@ -111,6 +129,132 @@ else
     echo -e "${GRN}✅ Nextflow is installed.${NC}"
 fi
 
+# -------- fzf check / optional install ---------
+FZF_AVAILABLE="false"
+if command -v fzf >/dev/null 2>&1; then
+  FZF_AVAILABLE="true"
+  echo -e "${GRN}✅ fzf is installed. Interactive file picker enabled.${NC}"
+else
+  echo -e "${YEL}ℹ️  fzf (interactive picker) not found.${NC}"
+  read -rp "🧭 Install fzf for interactive file selection? [y/N]: " INSTALL_FZF
+  INSTALL_FZF=$(echo "$INSTALL_FZF" | tr '[:upper:]' '[:lower:]')
+  if [[ "$INSTALL_FZF" == "y" ]]; then
+    install_msg "Installing fzf..."
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+      if command -v apt-get >/dev/null 2>&1; then
+        sudo apt-get update && sudo apt-get install -y fzf || { echo -e "${RED}❌ fzf install failed. Proceeding without it.${NC}"; }
+      elif command -v dnf >/dev/null 2>&1; then
+        sudo dnf install -y fzf || { echo -e "${RED}❌ fzf install failed. Proceeding without it.${NC}"; }
+      elif command -v yum >/dev/null 2>&1; then
+        sudo yum install -y fzf || { echo -e "${RED}❌ fzf install failed. Proceeding without it.${NC}"; }
+      else
+        echo -e "${YEL}⚠️  Unknown Linux package manager. Consider installing fzf manually.${NC}"
+      fi
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+      if command -v brew >/dev/null 2>&1; then
+        brew install fzf || true
+        # Install key-bindings/completion (safe if it fails)
+        "$(brew --prefix)"/opt/fzf/install --key-bindings --completion --no-bashrc --no-fish --no-zsh || true
+      else
+        echo -e "${YEL}⚠️  Homebrew not found. Install fzf manually (https://github.com/junegunn/fzf).${NC}"
+      fi
+    else
+      echo -e "${YEL}⚠️  Unrecognized OS. Install fzf manually if desired.${NC}"
+    fi
+
+    if command -v fzf >/dev/null 2>&1; then
+      FZF_AVAILABLE="true"
+      echo -e "${GRN}✅ fzf installed. Interactive picker enabled.${NC}"
+    else
+      echo -e "${YEL}➡️  Continuing without fzf. We'll use standard prompts.${NC}"
+    fi
+  else
+    echo -e "${YEL}➡️  Skipping fzf install. We'll use standard prompts.${NC}"
+  fi
+fi
+
+# -------- findutils (gfind) check/install for macOS ---------
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  if ! command -v gfind >/dev/null 2>&1; then
+    echo -e "${YEL}🔧 GNU findutils (gfind) not found. Installing via Homebrew...${NC}"
+    if command -v brew &> /dev/null; then
+      brew install findutils || {
+        echo -e "${RED}❌ Failed to install findutils. Please install manually: brew install findutils${NC}"
+        exit 1
+      }
+      echo -e "${GRN}✅ gfind installed successfully.${NC}"
+    else
+      echo -e "${RED}❌ Homebrew not found. Please install Homebrew (https://brew.sh) and rerun this script.${NC}"
+      exit 1
+    fi
+  else
+    echo -e "${GRN}✅ gfind is installed.${NC}"
+  fi
+fi
+
+###############################################################################
+#                         Helpers (fzf-based pickers)                         #
+###############################################################################
+
+# choose_file <prompt> <extensions_csv> <search_dir>
+#   examples: "vcf,vcf.gz" or "csv,tsv"
+choose_file() {
+  local prompt="$1"
+  local exts_csv="$2"
+  local search_dir="$3"
+
+  # If fzf isn't available, do plain prompt
+  if ! command -v fzf >/dev/null 2>&1; then
+    read -rp "$prompt " path
+    printf '%s\n' "$path"
+    return
+  fi
+
+  # Use gfind on macOS if available; otherwise find
+  local FIND_BIN="find"
+  if command -v gfind >/dev/null 2>&1; then
+    FIND_BIN="gfind"
+  fi
+
+  # Build case-insensitive -iname patterns safely
+  local IFS=,
+  local exts=()
+  read -r -a exts <<< "$exts_csv"
+
+  local args=( "$search_dir" -type f \( )
+  local first=1
+  local e
+  for e in "${exts[@]}"; do
+    if [ $first -eq 0 ]; then args+=( -o ); fi
+    args+=( -iname "*.${e}" )
+    first=0
+  done
+  args+=( \) )
+
+  # Get the candidate list FIRST; if empty, skip fzf
+  local files
+  files="$("$FIND_BIN" "${args[@]}" 2>/dev/null | LC_ALL=C sort)"
+
+  if [ -z "$files" ]; then
+    echo "No matches under '$search_dir' for extensions: ${exts[*]}"
+    read -rp "$prompt " path
+    printf '%s\n' "$path"
+    return
+  fi
+
+  # Always try fzf when available
+  local selection
+  selection="$(printf '%s\n' "$files" | fzf --prompt="$prompt " --height=20 --border --layout=default || true)"
+
+  if [ -n "$selection" ]; then
+    printf '%s\n' "$selection"
+  else
+    # user pressed ESC/Enter with no selection — fall back to manual input
+    read -rp "$prompt " path
+    printf '%s\n' "$path"
+  fi
+}
+
 ###############################################################################
 
 # --- Results Dir, Logging & Debugging ---
@@ -124,7 +268,6 @@ echo "date: $(date)" >> "$PARAM_LOG"
 echo "MR-CoPe version: $VERSION" >> "$PARAM_LOG"
 
 append_filter_summary() {
-  # Usage: append_filter_summary "step" "file" "kept" "removed" "msg"
   echo "$1,$2,$3,$4,$5" >> "$FILTER_SUMMARY"
 }
 append_param_log() {
@@ -143,8 +286,9 @@ fi
 
 # ------------------------ File Input Collection + Validation ------------------------
 if [[ "$INPUT_TYPE" == "vcf" ]]; then
-  read -rp "📥 Enter path to Exposure VCF (.vcf or .vcf.gz): " EXPOSURE_VCF
-  read -rp "📥 Enter path to Outcome VCF (.vcf or .vcf.gz): " OUTCOME_VCF
+  # Use fzf picker (or fallback) for VCF paths
+  EXPOSURE_VCF="$(choose_file "📥 Select Exposure VCF (.vcf or .vcf.gz):" "vcf,vcf.gz" "$DATA_DIR")"
+  OUTCOME_VCF="$(choose_file  "📥 Select Outcome VCF (.vcf or .vcf.gz):"  "vcf,vcf.gz" "$DATA_DIR")"
 
   for file in "$EXPOSURE_VCF" "$OUTCOME_VCF"; do
     if [[ ! -f "$file" ]]; then
@@ -162,23 +306,24 @@ if [[ "$INPUT_TYPE" == "vcf" ]]; then
   LOG10_INPUT=$(echo "$LOG10_INPUT" | tr '[:upper:]' '[:lower:]')
   append_param_log "log10_flag" "$LOG10_INPUT"
 
+  # --- Export BEFORE calling Python so subprocesses can read them ---
+  export EXPOSURE_VCF OUTCOME_VCF LOG10_INPUT
+
   echo "🔄 Parsing VCF: $EXPOSURE_VCF → ./tmp_exposure.csv"
-  python3 - <<EOF
-import gzip, csv, sys
-vcf_path = "$EXPOSURE_VCF"
+  python3 - <<'EOF'
+import gzip, csv, sys, os
+vcf_path = os.environ.get("EXPOSURE_VCF")
 csv_path = "./tmp_exposure.csv"
-is_log10 = "$LOG10_INPUT" == "y"
+is_log10 = (os.environ.get("LOG10_INPUT","n").lower() == "y")
 def parse_sample_field(field):
     es, se, lp, af, rsid = field.split(":")
     try:
         pval = 10 ** (-float(lp)) if is_log10 else float(lp)
-    except:
+    except Exception:
         pval = None
-    return {
-        "BETA": float(es), "SE": float(se), "PVALUE": pval,
-        "EAF": float(af), "SNP": rsid
-    }
-with (gzip.open(vcf_path, 'rt') if vcf_path.endswith('.gz') else open(vcf_path, 'r')) as vcf_in, open(csv_path, 'w', newline='') as csv_out:
+    return {"BETA": float(es), "SE": float(se), "PVALUE": pval, "EAF": float(af), "SNP": rsid}
+open_vcf = gzip.open if vcf_path.endswith('.gz') else open
+with (open_vcf(vcf_path, 'rt')) as vcf_in, open(csv_path, 'w', newline='') as csv_out:
     writer = None; rows = 0
     for line in vcf_in:
         if line.startswith("##"): continue
@@ -193,10 +338,9 @@ with (gzip.open(vcf_path, 'rt') if vcf_path.endswith('.gz') else open(vcf_path, 
         chrom, pos, snp_id, ref, alt = fields[0], fields[1], fields[2], fields[3], fields[4]
         try:
             stats = parse_sample_field(fields[sample_col])
-            writer.writerow({
-                "SNP": stats["SNP"], "CHR": chrom, "BP": pos, "A1": alt, "A2": ref,
-                "BETA": stats["BETA"], "SE": stats["SE"], "PVALUE": stats["PVALUE"], "EAF": stats["EAF"]
-            }); rows += 1
+            writer.writerow({"SNP": stats["SNP"], "CHR": chrom, "BP": pos, "A1": alt, "A2": ref,
+                             "BETA": stats["BETA"], "SE": stats["SE"], "PVALUE": stats["PVALUE"], "EAF": stats["EAF"]})
+            rows += 1
         except Exception as e:
             print(f"⚠️ Skipping line at position {pos}: {e}", file=sys.stderr)
     print(rows, file=sys.stderr)
@@ -205,22 +349,20 @@ EOF
   append_filter_summary "vcf_parse_exposure" "./tmp_exposure.csv" "$NROWS" "NA" "VCF→CSV conversion"
 
   echo "🔄 Parsing VCF: $OUTCOME_VCF → ./tmp_outcome.csv"
-  python3 - <<EOF
-import gzip, csv, sys
-vcf_path = "$OUTCOME_VCF"
+  python3 - <<'EOF'
+import gzip, csv, sys, os
+vcf_path = os.environ.get("OUTCOME_VCF")
 csv_path = "./tmp_outcome.csv"
-is_log10 = "$LOG10_INPUT" == "y"
+is_log10 = (os.environ.get("LOG10_INPUT","n").lower() == "y")
 def parse_sample_field(field):
     es, se, lp, af, rsid = field.split(":")
     try:
         pval = 10 ** (-float(lp)) if is_log10 else float(lp)
-    except:
+    except Exception:
         pval = None
-    return {
-        "BETA": float(es), "SE": float(se), "PVALUE": pval,
-        "EAF": float(af), "SNP": rsid
-    }
-with (gzip.open(vcf_path, 'rt') if vcf_path.endswith('.gz') else open(vcf_path, 'r')) as vcf_in, open(csv_path, 'w', newline='') as csv_out:
+    return {"BETA": float(es), "SE": float(se), "PVALUE": pval, "EAF": float(af), "SNP": rsid}
+open_vcf = gzip.open if vcf_path.endswith('.gz') else open
+with (open_vcf(vcf_path, 'rt')) as vcf_in, open(csv_path, 'w', newline='') as csv_out:
     writer = None; rows = 0
     for line in vcf_in:
         if line.startswith("##"): continue
@@ -235,10 +377,9 @@ with (gzip.open(vcf_path, 'rt') if vcf_path.endswith('.gz') else open(vcf_path, 
         chrom, pos, snp_id, ref, alt = fields[0], fields[1], fields[2], fields[3], fields[4]
         try:
             stats = parse_sample_field(fields[sample_col])
-            writer.writerow({
-                "SNP": stats["SNP"], "CHR": chrom, "BP": pos, "A1": alt, "A2": ref,
-                "BETA": stats["BETA"], "SE": stats["SE"], "PVALUE": stats["PVALUE"], "EAF": stats["EAF"]
-            }); rows += 1
+            writer.writerow({"SNP": stats["SNP"], "CHR": chrom, "BP": pos, "A1": alt, "A2": ref,
+                             "BETA": stats["BETA"], "SE": stats["SE"], "PVALUE": stats["PVALUE"], "EAF": stats["EAF"]})
+            rows += 1
         except Exception as e:
             print(f"⚠️ Skipping line at position {pos}: {e}", file=sys.stderr)
     print(rows, file=sys.stderr)
@@ -251,8 +392,9 @@ EOF
   LOG10_FLAG="$LOG10_INPUT"
 
 else
-  read -rp "📥 Enter path to Exposure GWAS summary statistics (.csv or .tsv): " EXPOSURE_PATH
-  read -rp "📥 Enter path to Outcome GWAS summary statistics (.csv or .tsv): " OUTCOME_PATH
+  # Use fzf picker (or fallback) for CSV/TSV paths
+  EXPOSURE_PATH="$(choose_file "📥 Select Exposure GWAS (.csv or .tsv):" "csv,tsv" "$DATA_DIR")"
+  OUTCOME_PATH="$(choose_file  "📥 Select Outcome GWAS (.csv or .tsv):"  "csv,tsv" "$DATA_DIR")"
 
   for file in "$EXPOSURE_PATH" "$OUTCOME_PATH"; do
     if [[ ! -f "$file" ]]; then
@@ -274,72 +416,96 @@ fi
 # ------------------------ LD Clumping Settings ------------------------
 
 echo ""
-echo "📊 LD Clumping Settings:"
-echo "   - These affect SNP pruning based on correlation (LD)."
-echo "   - More relaxed values will keep more SNPs."
-read -rp "📏 LD clumping window size in kb (default: 10000): " CLUMP_KB
-read -rp "🔗 LD clumping r² threshold (default: 0.001): " CLUMP_R2
+echo -e "${GRN}🧩 LD Pruning Step${NC}"
+echo "--------------------------------------------------------"
+echo "You can SKIP LD clumping if you wish (not generally recommended for most MR)."
+read -rp "⏭️  Skip LD pruning? [y/N]: " SKIP_LD
+SKIP_LD=$(echo "$SKIP_LD" | tr '[:upper:]' '[:lower:]')
 
-CLUMP_KB="${CLUMP_KB:-10000}"
-CLUMP_R2="${CLUMP_R2:-0.001}"
+if [[ "$SKIP_LD" == "y" ]]; then
+  DO_LD="false"
+  echo -e "${YEL}⚠️  LD pruning will be skipped. All SNPs will be retained for MR.${NC}"
+else
+  DO_LD="true"
+fi
+append_param_log "skip_ld" "$SKIP_LD"
 
-# ------------------------ Edge Case Warnings ------------------------
-if [[ "$CLUMP_KB" -gt 100000 ]]; then
-  echo -e "${YEL}⚠️ WARNING: You entered a very large window size (${CLUMP_KB} kb). This may remove too many SNPs.${NC}"
-fi
-if [[ "$CLUMP_KB" -lt 50 ]]; then
-  echo -e "${YEL}⚠️ WARNING: You entered a very small window size (${CLUMP_KB} kb). This may retain highly correlated SNPs.${NC}"
-fi
-if (( $(echo "$CLUMP_R2 == 1" | bc -l) )); then
-  echo -e "${YEL}⚠️ WARNING: r² = 1 means no LD pruning will be performed.${NC}"
-fi
-if (( $(echo "$CLUMP_R2 < 0.0001" | bc -l) )); then
-  echo -e "${YEL}⚠️ WARNING: Very low r² will keep almost no SNPs.${NC}"
-fi
+if [[ "$SKIP_LD" != "y" ]]; then
+  echo ""
+  echo "📊 LD Clumping Settings:"
+  echo "   - These affect SNP pruning based on correlation (LD)."
+  echo "   - More relaxed values will keep more SNPs."
+  read -rp "📏 LD clumping window size in kb (default: 10000): " CLUMP_KB
+  read -rp "🔗 LD clumping r² threshold (default: 0.001): " CLUMP_R2
 
-if ! [[ "$CLUMP_KB" =~ ^[0-9]+$ ]]; then
-  echo -e "${RED}❌ Invalid clump_kb value. Must be an integer.${NC}"
-  exit 1
-fi
-if ! awk "BEGIN {exit !($CLUMP_R2 > 0 && $CLUMP_R2 <= 1)}"; then
-  echo -e "${RED}❌ Invalid clump_r2 value. Must be a number > 0 and ≤ 1 (e.g., 0.01, 1.0).${NC}"
-  exit 1
-fi
+  CLUMP_KB="${CLUMP_KB:-10000}"
+  CLUMP_R2="${CLUMP_R2:-0.001}"
 
-# ------------------------ LD Population Selection ------------------------
-echo ""
-echo "🌍 LD Reference Population:"
-echo "   - EUR (European, default)"
-echo "   - AFR (African)"
-echo "   - EAS (East Asian)"
-echo "   - SAS (South Asian)"
-echo "   - AMR (Admixed American/Latino)"
-read -rp "LD reference population for clumping? [EUR/AFR/EAS/SAS/AMR] (default: EUR): " LD_POP
-LD_POP="${LD_POP:-EUR}"
-append_param_log "ld_pop" "$LD_POP"
+  # Edge case warnings (portable, avoid bc)
+  awk -v kb="$CLUMP_KB" 'BEGIN{ if (kb+0>100000) print "WARN_LARGE"; else if (kb+0<50) print "WARN_SMALL"; }' | while read -r w; do
+    case "$w" in
+      WARN_LARGE) echo -e "${YEL}⚠️ WARNING: You entered a very large window size (${CLUMP_KB} kb). This may remove too many SNPs.${NC}";;
+      WARN_SMALL) echo -e "${YEL}⚠️ WARNING: You entered a very small window size (${CLUMP_KB} kb). This may retain highly correlated SNPs.${NC}";;
+    esac
+  done
+
+  awk -v r2="$CLUMP_R2" 'BEGIN{
+    if (r2 == 1) print "WARN_EQ1";
+    if (r2+0 < 0.0001) print "WARN_VLOW";
+    if (!(r2 > 0 && r2 <= 1)) print "ERR_BAD";
+  }' | while read -r w; do
+    case "$w" in
+      WARN_EQ1)  echo -e "${YEL}⚠️ WARNING: r² = 1 means no LD pruning will be performed.${NC}";;
+      WARN_VLOW) echo -e "${YEL}⚠️ WARNING: Very low r² will keep almost no SNPs.${NC}";;
+      ERR_BAD)   echo -e "${RED}❌ Invalid clump_r2 value. Must be a number > 0 and ≤ 1 (e.g., 0.01, 1.0).${NC}"; exit 1;;
+    esac
+  done
+
+  if ! [[ "$CLUMP_KB" =~ ^[0-9]+$ ]]; then
+    echo -e "${RED}❌ Invalid clump_kb value. Must be an integer.${NC}"
+    exit 1
+  fi
+
+  echo ""
+  echo "🌍 LD Reference Population:"
+  echo "   - EUR (European, default)"
+  echo "   - AFR (African)"
+  echo "   - EAS (East Asian)"
+  echo "   - SAS (South Asian)"
+  echo "   - AMR (Admixed American/Latino)"
+  read -rp "LD reference population for clumping? [EUR/AFR/EAS/SAS/AMR] (default: EUR): " LD_POP
+  LD_POP="${LD_POP:-EUR}"
+  append_param_log "ld_pop" "$LD_POP"
+else
+  CLUMP_KB=""
+  CLUMP_R2=""
+  LD_POP=""
+fi
 
 # ------------------------ Clumping Sensitivity Panel ------------------------
-echo ""
-read -rp "🧪 Run clumping sensitivity panel (try several kb/r² combinations in parallel)? [y/N]: " SENS_PANEL
-SENS_PANEL=$(echo "$SENS_PANEL" | tr '[:upper:]' '[:lower:]')
+if [[ "$SKIP_LD" != "y" ]]; then
+  echo ""
+  read -rp "🧪 Run clumping sensitivity panel (try several kb/r² combinations in parallel)? [y/N]: " SENS_PANEL
+  SENS_PANEL=$(echo "$SENS_PANEL" | tr '[:upper:]' '[:lower:]')
 
-if [[ "$SENS_PANEL" == "y" ]]; then
-  echo -e "${YEL}Running clumping with multiple parameter combinations...${NC}"
-  PANEL_KB=(500 1000 5000 10000)
-  PANEL_R2=(0.01 0.05 0.1 0.5)
-  PANEL_LOG="./results/clumping_sensitivity_panel.csv"
-  echo "window_kb,r2,num_SNPs_retained" > "$PANEL_LOG"
-  for KB in "${PANEL_KB[@]}"; do
-    for R2 in "${PANEL_R2[@]}"; do
-      OUT="./results/tmp_clump_${KB}_${R2}.csv"
-      docker run --rm -v "$PWD":/data mrcope:latest \
-        Rscript /app/03_linkage_disequillibrium.R "$EXPOSURE_PATH" "$OUT" "$KB" "$R2" "$LD_POP"
-      COUNT=$(awk 'END{print NR-1}' "$OUT")
-      echo "$KB,$R2,$COUNT" >> "$PANEL_LOG"
-      rm -f "$OUT"
+  if [[ "$SENS_PANEL" == "y" ]]; then
+    echo -e "${YEL}Running clumping with multiple parameter combinations...${NC}"
+    PANEL_KB=(500 1000 5000 10000)
+    PANEL_R2=(0.01 0.05 0.1 0.5)
+    PANEL_LOG="./results/clumping_sensitivity_panel.csv"
+    echo "window_kb,r2,num_SNPs_retained" > "$PANEL_LOG"
+    for KB in "${PANEL_KB[@]}"; do
+      for R2 in "${PANEL_R2[@]}"; do
+        OUT="./results/tmp_clump_${KB}_${R2}.csv"
+        docker run --rm -v "$PWD":/data mrcope:latest \
+          Rscript /app/03_linkage_disequillibrium.R "$EXPOSURE_PATH" "$OUT" "$KB" "$R2" "$LD_POP"
+        COUNT=$(awk 'END{print NR-1}' "$OUT")
+        echo "$KB,$R2,$COUNT" >> "$PANEL_LOG"
+        rm -f "$OUT"
+      done
     done
-  done
-  echo -e "${GRN}Panel complete. Results in $PANEL_LOG${NC}"
+    echo -e "${GRN}Panel complete. Results in $PANEL_LOG${NC}"
+  fi
 fi
 
 # ------------------------ Confounder Keyword Input ------------------------
@@ -369,9 +535,13 @@ echo ""
 echo -e "${GRN}🔎 Pipeline launch summary:${NC}"
 printf "  %-22s %s\n" "Exposure file:" "$EXPOSURE_PATH"
 printf "  %-22s %s\n" "Outcome file:" "$OUTCOME_PATH"
-printf "  %-22s %s\n" "LD window (kb):" "$CLUMP_KB"
-printf "  %-22s %s\n" "LD r² cutoff:" "$CLUMP_R2"
-printf "  %-22s %s\n" "LD population:" "$LD_POP"
+if [[ "$SKIP_LD" == "y" ]]; then
+  printf "  %-22s %s\n" "LD pruning:" "SKIPPED"
+else
+  printf "  %-22s %s\n" "LD window (kb):" "$CLUMP_KB"
+  printf "  %-22s %s\n" "LD r² cutoff:" "$CLUMP_R2"
+  printf "  %-22s %s\n" "LD population:" "$LD_POP"
+fi
 printf "  %-22s %s\n" "Output dir:" "./results"
 printf "  %-22s %s\n" "MR-CoPe version:" "$VERSION"
 echo "--------------------------------------------------------"
@@ -401,6 +571,7 @@ CMD="$NF_CMD run main.nf -with-docker \"$IMAGE_NAME\" \
     --clump_kb \"$CLUMP_KB\" \
     --clump_r2 \"$CLUMP_R2\" \
     --ld_pop \"$LD_POP\" \
+    --skip_ld \"$SKIP_LD\" \
     --trait_keyword \"$TRAIT_KEYWORDS\" \
     --output_dir \"./results\" \
     -resume"
@@ -416,6 +587,7 @@ echo -e "${YEL}💡 If the pipeline is interrupted, just re-run with '-resume'.$
 
 echo ""
 echo -e "${GRN}🚀 Launching MR-CoPe Pipeline with Docker...${NC}"
+# shellcheck disable=SC2086
 if ! eval $CMD; then
   echo -e "${RED}❌ Pipeline failed!${NC}"
   echo -e "${YEL}💡 You can resume from where you left off using:${NC}"
