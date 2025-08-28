@@ -1,580 +1,318 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>MR-CoPe | Mendelian Randomisation Dashboard</title>
+
+  <!-- Fonts & libs -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.5/css/jquery.dataTables.min.css"/>
   <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.dataTables.min.css"/>
-  <link rel="stylesheet" href="https://cdn.datatables.net/scroller/2.2.0/css/scroller.dataTables.min.css"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
-  <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
-  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-  <script src="https://cdn.datatables.net/1.13.5/js/jquery.dataTables.min.js"></script>
-  <script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
-  <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
-  <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.print.min.js"></script>
-  <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.colVis.min.js"></script>
-  <script src="https://cdn.datatables.net/scroller/2.2.0/js/dataTables.scroller.min.js"></script>
+
+  <!-- Style -->
   <style>
-    :root {
-      --bg: #f6f8fa;
-      --card-bg: #fff;
-      --accent: #356cf2;
-      --danger: #e74c3c;
-      --table-head: #21232c;
-      --text: #21232c;
-      --shadow: 0 4px 30px rgba(56,78,138,0.09);
-      --border: #e1e6ee;
-      --border-radius: 22px;
-      --font-main: 'Inter', Arial, sans-serif;
-      --success: #38c172;
-      --table-bg: #f1f5f9;
+    :root{
+      --bg:#f7f8fb;--card-bg:#fff;--accent:#356cf2;--accent-2:#009e73;--danger:#e74c3c;
+      --text:#1a1d29;--muted:#6c738a;--table-head:#1f2433;--border:#e6e9f2;
+      --shadow:0 10px 30px rgba(40,56,116,.10);--radius:20px;--font:'Inter',system-ui,Arial,sans-serif
     }
-    [data-theme="dark"] {
-      --bg: #1b2028;
-      --card-bg: #23262f;
-      --accent: #3ecfff;
-      --danger: #f35d5d;
-      --table-head: #f5f8fa;
-      --text: #eaeaf4;
-      --shadow: 0 4px 30px rgba(30,45,80,0.34);
-      --border: #383c4a;
-      --success: #38d39f;
-      --table-bg: #1b2230;
+    [data-theme="dark"]{
+      --bg:#161a22;--card-bg:#1f2430;--accent:#3ecfff;--accent-2:#24d2a6;--danger:#f35d5d;
+      --text:#e7e9f3;--muted:#9aa3ba;--table-head:#e6e9f2;--border:#2d3646;--shadow:0 10px 30px rgba(0,0,0,.35)
     }
-    html, body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--font-main);
-      font-size: 17px;
-      margin: 0;
-      padding: 0;
-      min-height: 100vh;
-      transition: background .3s, color .3s;
-    }
-    .container {
-      max-width: 1280px;
-      margin: 1.2rem auto 0;
-      padding: 0 1.5vw 4rem 1.5vw;
-    }
-    h1 {
-      font-size: 2.35rem;
-      letter-spacing: -0.02em;
-      font-weight: 800;
-      margin-top: 0;
-      margin-bottom: 0.2rem;
-      color: var(--accent);
-      line-height: 1.18;
-    }
-    h2 {
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      color: var(--table-head);
-      margin-top: 0;
-    }
-    .dashboard {
-      display: flex;
-      gap: 1.3rem;
-      margin: 2.1rem 0 2.5rem;
-      flex-wrap: wrap;
-      justify-content: stretch;
-    }
-    .card {
-      background: var(--card-bg);
-      box-shadow: var(--shadow);
-      border-radius: var(--border-radius);
-      flex: 1 1 210px;
-      min-width: 180px;
-      max-width: 280px;
-      padding: 2.2rem 1.2rem 1.4rem;
-      text-align: center;
-      margin-bottom: .8rem;
-      border: 1.5px solid var(--border);
-      position: relative;
-      overflow: hidden;
-    }
-    .card:before {
-      content: '';
-      position: absolute;
-      top: -100px; left: 0; right: 0;
-      height: 110px;
-      background: linear-gradient(90deg, var(--accent) 0%, transparent 100%);
-      opacity: 0.08;
-      z-index: 0;
-    }
-    .card h3 {
-      font-size: 1.08rem;
-      color: var(--accent);
-      margin: 0 0 .2rem 0;
-      font-weight: 700;
-      position: relative;
-      z-index: 1;
-      letter-spacing: 0.01em;
-    }
-    .card p {
-      font-size: 2.05rem;
-      margin: 0;
-      color: var(--table-head);
-      font-weight: 900;
-      letter-spacing: -0.01em;
-      position: relative;
-      z-index: 1;
-    }
-    .section {
-      background: var(--card-bg);
-      box-shadow: var(--shadow);
-      border-radius: var(--border-radius);
-      padding: 2.8rem 2.3rem 2.2rem;
-      margin-bottom: 3.2rem;
-      margin-top: 1.6rem;
-      border: 1.5px solid var(--border);
-    }
-    .tabbed {
-      margin-bottom: 2.2rem;
-    }
-    .tab-buttons {
-      display: flex;
-      border-bottom: 2px solid var(--border);
-      gap: 2px;
-      margin-bottom: 1.3rem;
-      background: none;
-    }
-    .tab-btn {
-      background: none;
-      border: none;
-      font-size: 1.10rem;
-      font-family: inherit;
-      font-weight: 800;
-      color: var(--accent);
-      padding: 0.8rem 2.3rem 0.75rem 1.5rem;
-      border-top-left-radius: 15px;
-      border-top-right-radius: 15px;
-      border-bottom: 3px solid transparent;
-      cursor: pointer;
-      margin-right: .2rem;
-      transition: background .13s, border-bottom .18s, color .15s;
-      outline: none;
-      letter-spacing: 0.01em;
-    }
-    .tab-btn.active, .tab-btn:hover {
-      background: var(--bg);
-      border-bottom: 3px solid var(--accent);
-      color: var(--table-head);
-    }
-    .tab-content {
-      display: none;
-      animation: fadein .38s;
-    }
-    .tab-content.active {
-      display: block;
-    }
-    @keyframes fadein {
-      from {opacity: 0;}
-      to {opacity: 1;}
-    }
-    .plot-toolbar {
-      display: flex;
-      gap: 1.3rem;
-      align-items: center;
-      margin-bottom: -2.4rem;
-      justify-content: flex-end;
-    }
-    .plot-toolbar button {
-      border: none;
-      background: none;
-      color: var(--accent);
-      font-size: 1.20rem;
-      cursor: pointer;
-      padding: 0.38rem 0.6rem;
-      border-radius: 7px;
-      transition: background .13s;
-    }
-    .plot-toolbar button:hover {
-      background: var(--bg);
-    }
-    .plot-toolbar label {
-      font-size: .97rem;
-      color: var(--text);
-      font-weight: 600;
-    }
-    .plot-area {
-      margin-top: 2.5rem;
-      margin-bottom: .9rem;
-      border-radius: 14px;
-      overflow: hidden;
-      border: 1.2px solid var(--border);
-      background: var(--table-bg);
-    }
-    #scatter, #forest, #manhattan_exposure, #manhattan_outcome, #qq_exposure, #qq_outcome {
-      width: 100%;
-      height: 470px;
-      min-height: 350px;
-      margin: 0 auto;
-      display: block;
-      border-radius: 10px;
-    }
-    table.dataTable {
-      width: 100%;
-      background: var(--table-bg);
-      font-size: 1.05rem;
-      border-collapse: separate;
-      border-spacing: 0;
-      border-radius: 12px;
-      overflow: hidden;
-    }
-    .dataTables_wrapper .dt-buttons {
-      float: right;
-      margin-left: 1.2em;
-      margin-bottom: .6em;
-    }
-    table.dataTable thead th {
-      background: var(--bg);
-      color: var(--table-head);
-      border-bottom: 2px solid var(--border);
-      font-weight: 900;
-      font-size: 1.08rem;
-      padding-top: 0.9em;
-      padding-bottom: 0.9em;
-      letter-spacing: .01em;
-    }
-    table.dataTable tbody td {
-      border-bottom: 1px solid var(--border);
-      color: var(--text);
-      background: var(--table-bg);
-      font-family: inherit;
-      padding: 0.6em 0.5em;
-    }
+    *{box-sizing:border-box}
+    html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);font-size:16px}
+    .container{max-width:1240px;margin:18px auto 64px;padding:0 18px}
+    h1{font-size:2.05rem;letter-spacing:-.02em;margin:.2rem 0 0;color:var(--accent);font-weight:800}
+    h2{font-weight:800;letter-spacing:-.02em;margin:0 0 .7rem}
+    .subhead{color:var(--muted);margin:.35rem 0 1.8rem}
+    .grid-kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin:18px 0 26px}
+    .kpi{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
+    .kpi h3{margin:0;color:var(--muted);font-size:.95rem;font-weight:700}
+    .kpi .val{font-size:1.9rem;font-weight:900;letter-spacing:-.02em;margin-top:2px;color:var(--table-head)}
+    .section{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:22px;margin:18px 0 28px}
+    .section-header{display:flex;gap:10px;flex-wrap:wrap;justify-content:space-between;align-items:baseline;margin-bottom:10px}
+    .pill{display:inline-block;border:1px solid var(--border);padding:.25rem .55rem;border-radius:999px;font-size:.82rem;color:var(--muted);white-space:nowrap}
+    .tabbed .tabs{display:flex;gap:6px;border-bottom:1px solid var(--border);margin:6px 0 12px;flex-wrap:wrap}
+    .tab{background:transparent;border:none;color:var(--accent);font-weight:800;padding:.7rem 1rem;border-top-left-radius:12px;border-top-right-radius:12px;border-bottom:3px solid transparent;cursor:pointer}
+    .tab.active,.tab:hover{border-bottom:3px solid var(--accent);color:var(--table-head);background:var(--bg)}
+    .tab-content{display:none;animation:fade .25s ease}
+    .tab-content.active{display:block}
+    @keyframes fade{from{opacity:.6}to{opacity:1}}
+
+    /* Figures */
+    .fig-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+    .fig{background:var(--card-bg);border:1px solid var(--border);border-radius:14px;padding:10px}
+    .fig h4{margin:6px 8px 10px;font-weight:800}
+    .fig img{width:100%;height:auto;border-radius:10px;border:1px solid var(--border);display:block}
+
+    /* Tables wrapper */
+    .table-wrap{width:100%;overflow:auto;border-radius:12px}
+    .mr-table{width:100%;border-collapse:separate;border-spacing:0;border-radius:12px;overflow:hidden}
+    .mr-table th,.mr-table td{padding:.75rem;border-bottom:1px solid var(--border);text-align:center;vertical-align:middle}
+    .mr-table thead th{position:sticky;top:0;z-index:1;background:var(--bg)}
+    .compact td,.compact th{padding:.55rem .5rem !important}
+    .nowrap{white-space:nowrap}
+    .num{text-align:right}
+    .muted{color:var(--muted)}
+
+    /* DataTables theme integration */
+    table.dataTable,
+    table.dataTable thead th,
+    table.dataTable tbody td,
     table.dataTable tfoot th {
-      border-top: 2px solid var(--border);
-      background: var(--bg);
+      background: var(--card-bg) !important;
+      color: var(--text) !important;
     }
-    .zoom-slider {
-      margin-top: 1.3rem;
-      width: 260px;
-      max-width: 100%;
-      display: flex;
-      align-items: center;
-      gap: 0.7em;
+    table.dataTable thead th,
+    table.dataTable tbody td,
+    table.dataTable tfoot th {
+      border-bottom: 1px solid var(--border) !important;
     }
-    .zoom-slider input[type=range] {
-      width: 140px;
-      accent-color: var(--accent);
+    table.dataTable thead th { border-bottom: 2px solid var(--border) !important; }
+    .dataTables_wrapper .dt-buttons .dt-button{
+      background:var(--card-bg) !important; color:var(--accent) !important;
+      border:1px solid var(--border) !important; border-radius:10px !important; padding:.35rem .6rem !important;
     }
-    .footer {
-      text-align: center;
-      font-size: 0.95rem;
-      color: #9496b3;
-      margin-top: 2.7rem;
-      letter-spacing: .01em;
-      padding-bottom: .7rem;
+    .dataTables_wrapper .dataTables_filter input{
+      background:var(--card-bg) !important; color:var(--text) !important;
+      border:1px solid var(--border) !important; border-radius:8px !important; padding:.35rem .5rem !important;
     }
-    .toggle-theme {
-      position: fixed;
-      top: 14px;
-      right: 19px;
-      z-index: 9999;
-      background: var(--card-bg);
-      border: 1.5px solid var(--border);
-      color: var(--accent);
-      padding: 0.6rem 1.17rem 0.55rem;
-      border-radius: 12px;
-      font-weight: 900;
-      cursor: pointer;
-      font-size: 1.14rem;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.13);
-      transition: background .2s, color .16s;
+    .dataTables_wrapper .dataTables_paginate .paginate_button{
+      color:var(--text) !important; border:1px solid var(--border) !important;
+      background:var(--card-bg) !important; border-radius:8px !important; margin:0 2px !important;
     }
-    [data-theme="dark"] .toggle-theme {
-      background: var(--card-bg);
-      color: var(--accent);
+    .dataTables_wrapper .dataTables_paginate .paginate_button.current{
+      background:var(--bg) !important; color:var(--table-head) !important; border-color:var(--border) !important;
     }
-    @media (max-width: 760px) {
-      .dashboard { flex-direction: column; gap: 1.2rem; }
-      .section { padding: 1.6rem 1.1rem; }
-      .container { padding: 0 0vw 3rem 0vw; }
-      .toggle-theme { padding: 0.5rem 0.7rem; font-size: 1.04rem;}
-      h1 { font-size: 1.35rem;}
-    }
-    ::selection { background: var(--accent); color: #fff; }
-    .mr-results-table {
-      width: 100%;
-      background: var(--table-bg);
-      border-radius: 14px;
-      overflow: hidden;
-      border-collapse: collapse;
-      margin-bottom: 0;
-    }
-    .mr-results-table thead th, .mr-results-table tbody td {
-      padding: 0.95em 0.7em;
-      border-bottom: 1px solid var(--border);
-      text-align: center;
-    }
-    .mr-results-table thead th {
-      background: var(--bg);
-      color: var(--table-head);
-      font-size: 1.08rem;
-      font-weight: 900;
-      letter-spacing: .01em;
-      border-bottom: 2px solid var(--border);
-    }
-    .mr-results-table tbody tr:last-child td {
-      border-bottom: none;
-    }
-    .mr-results-table tbody td {
-      font-size: 1.01rem;
-    }
+
+    .footer{margin-top:28px;text-align:center;color:var(--muted);font-size:.95rem}
+    .theme{position:fixed;right:18px;top:14px;border:1px solid var(--border);background:var(--card-bg);color:var(--accent);border-radius:12px;padding:.48rem .7rem;cursor:pointer;box-shadow:var(--shadow)}
+    ::selection{background:var(--accent);color:#fff}
+    @media (max-width:760px){h1{font-size:1.5rem}}
   </style>
 </head>
 <body>
-  <button class="toggle-theme" id="theme-toggle-btn"><i class="fa-solid fa-circle-half-stroke"></i> Toggle Theme</button>
+  <button class="theme" id="theme-toggle"><i class="fa-solid fa-circle-half-stroke"></i> Theme</button>
 
   <div class="container">
-    <h1>🧬 MR-CoPe Interactive Report Dashboard</h1>
-    <p style="margin-bottom:2.2rem;"><strong>Date:</strong> <span id="today"></span></p>
+    <h1>🧬 MR-CoPe Report</h1>
+    <div class="subhead"><strong>Date:</strong> <span id="today"></span></div>
 
-    <div class="dashboard">
-      <div class="card"><h3>🧬 Instruments</h3><p><!-- SNP_COUNT --></p></div>
-      <div class="card"><h3>✅ Passed QC</h3><p><!-- QC_COUNT --></p></div>
-      <div class="card"><h3>📈 IVW OR</h3><p><!-- IVW_OR --></p></div>
-      <div class="card"><h3>📉 P-value</h3><p><!-- IVW_P --></p></div>
+    <!-- KPIs -->
+    <div class="grid-kpi">
+      <div class="kpi"><h3>🧬 Instruments</h3><div class="val"><!-- SNP_COUNT --></div></div>
+      <div class="kpi"><h3>✅ Passed QC</h3><div class="val"><!-- QC_COUNT --></div></div>
+      <div class="kpi"><h3>📈 IVW OR [95% CI]</h3><div class="val"><!-- IVW_OR --> <span class="pill"><!-- IVW_CI --></span></div></div>
+      <div class="kpi"><h3>📉 IVW p-value</h3><div class="val"><!-- IVW_P --></div></div>
     </div>
 
-    <!-- MR Results Section -->
+    <!-- MR summary -->
     <div class="section">
-      <h2>🧮 MR Results</h2>
-      <div style="overflow-x:auto;">
-        <table class="mr-results-table">
+      <div class="section-header">
+        <h2>🧮 Mendelian Randomisation Results</h2>
+        <span class="pill">heterogeneity &amp; intercept</span>
+      </div>
+      <div class="table-wrap">
+        <table class="mr-table compact">
           <thead>
             <tr>
-              <th>MR Method</th>
-              <th>OR</th>
-              <th>95% CI</th>
-              <th>p-value</th>
-              <th>Cochran Q</th>
-              <th>Q p-value</th>
-              <th>I² (%)</th>
-              <th>Egger Intercept p-value</th>
+              <th>MR Method</th><th>OR</th><th>95% CI</th><th>p-value</th>
+              <th>Cochran Q</th><th>Q p-value</th><th>I² (%)</th><th>Egger intercept p-value</th>
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td>IVW</td>
-              <td><!-- IVW_OR --></td>
-              <td><!-- IVW_CI --></td>
-              <td><!-- IVW_P --></td>
-              <td><!-- IVW_Q --></td>
-              <td><!-- IVW_QP --></td>
-              <td><!-- IVW_I2 --></td>
-              <td>—</td>
-            </tr>
-            <tr>
-              <td>WME</td>
-              <td><!-- WME_OR --></td>
-              <td><!-- WME_CI --></td>
-              <td><!-- WME_P --></td>
-              <td>—</td>
-              <td>—</td>
-              <td><!-- WME_I2 --></td>
-              <td>—</td>
-            </tr>
-            <tr>
-              <td>Egger</td>
-              <td><!-- EGGER_OR --></td>
-              <td><!-- EGGER_CI --></td>
-              <td><!-- EGGER_P --></td>
-              <td><!-- EGGER_Q --></td>
-              <td><!-- EGGER_QP --></td>
-              <td><!-- EGGER_I2 --></td>
-              <td><!-- EGGER_INT_P --></td>
-            </tr>
+            <tr><td>IVW</td><td class="num"><!-- IVW_OR --></td><td class="nowrap"><!-- IVW_CI --></td><td class="num"><!-- IVW_P --></td><td class="num"><!-- IVW_Q --></td><td class="num"><!-- IVW_QP --></td><td class="num"><!-- IVW_I2 --></td><td class="muted">—</td></tr>
+            <tr><td>Weighted median</td><td class="num"><!-- WME_OR --></td><td class="nowrap"><!-- WME_CI --></td><td class="num"><!-- WME_P --></td><td class="muted">—</td><td class="muted">—</td><td class="num"><!-- WME_I2 --></td><td class="muted">—</td></tr>
+            <tr><td>MR Egger</td><td class="num"><!-- EGGER_OR --></td><td class="nowrap"><!-- EGGER_CI --></td><td class="num"><!-- EGGER_P --></td><td class="num"><!-- EGGER_Q --></td><td class="num"><!-- EGGER_QP --></td><td class="num"><!-- EGGER_I2 --></td><td class="num"><!-- EGGER_INT_P --></td></tr>
           </tbody>
         </table>
       </div>
     </div>
 
-    <!-- SNP Table Tab -->
-    <div class="tabbed">
-      <div class="tab-buttons">
-        <button class="tab-btn active" data-tab="tab1"><i class="fa-solid fa-dna"></i> SNP Table</button>
-        <button class="tab-btn" data-tab="tab2"><i class="fa-solid fa-chart-scatter"></i> MR Scatter Plot</button>
-        <button class="tab-btn" data-tab="tab3"><i class="fa-solid fa-tree"></i> Forest Plot</button>
-        <button class="tab-btn" data-tab="tab4"><i class="fa-solid fa-chart-column"></i> Manhattan/QQ</button>
-        <button class="tab-btn" data-tab="tab5"><i class="fa-solid fa-table"></i> Method Summary</button>
+    <!-- Tabs: SNPs / Figures / Methods / Downloads -->
+    <div class="tabbed section">
+      <div class="tabs">
+        <button class="tab active" data-tab="t1"><i class="fa-solid fa-dna"></i> SNP table</button>
+        <button class="tab" data-tab="t4"><i class="fa-solid fa-images"></i> Static figures</button>
+        <button class="tab" data-tab="t5"><i class="fa-solid fa-table"></i> Method summary</button>
+        <button class="tab" data-tab="t6"><i class="fa-solid fa-download"></i> Downloads</button>
       </div>
 
-      <div class="tab-content active" id="tab1">
-        <div class="section" style="margin:0;">
-          <h2>📊 SNP Summary Table</h2>
-          <div class="zoom-slider">
-            <label><i class="fa-solid fa-magnifying-glass"></i> Zoom:</label>
-            <input type="range" min="0.7" max="1.8" value="1" step="0.05" id="tableZoomSlider">
-            <span id="tableZoomVal">1.00×</span>
-          </div>
-          <table id="snpTable" class="display nowrap" style="width:100%;">
+      <!-- t1: SNP table -->
+      <div id="t1" class="tab-content active">
+        <div class="section-header">
+          <h2>📊 SNP summary (harmonised)</h2>
+          <span class="pill">alleles • betas • SE • p • EAF • IVW OR</span>
+        </div>
+        <div class="table-wrap">
+          <table id="snpTable" class="display nowrap compact" style="width:100%">
             <thead>
               <tr>
                 <th>rsID</th>
-                <th>Beta Exposure</th>
-                <th>SE Exposure</th>
-                <th>P Exposure</th>
-                <th>Beta Outcome</th>
-                <th>SE Outcome</th>
-                <th>P Outcome</th>
-                <th>Effect Allele</th>
-                <th>Other Allele</th>
+                <th>CHR</th>
+                <th>BP</th>
+                <th>EA (Exp)</th>
+                <th>OA (Exp)</th>
+                <th>EA (Out)</th>
+                <th>OA (Out)</th>
+                <th>β Exp</th>
+                <th>SE Exp</th>
+                <th>P Exp</th>
+                <th>β Out</th>
+                <th>SE Out</th>
+                <th>P Out</th>
+                <th>EAF Exp</th>
+                <th>EAF Out</th>
+                <th>IVW OR</th>
+                <th>95% CI (IVW)</th>
               </tr>
             </thead>
-            <tbody>
-              <!-- SNP_TABLE_ROWS -->
-            </tbody>
+            <tbody><!-- SNP_TABLE_ROWS --></tbody>
           </table>
         </div>
       </div>
 
-      <div class="tab-content" id="tab2">
-        <div class="section" style="margin:0;">
-          <h2>📈 MR Scatter Plot</h2>
-          <div class="plot-toolbar">
-            <button onclick="downloadPlot('scatter', 'scatter.png', 'png')" title="Download as PNG"><i class="fa-solid fa-image"></i></button>
-            <button onclick="downloadPlot('scatter', 'scatter.pdf', 'pdf')" title="Download as PDF"><i class="fa-solid fa-file-pdf"></i></button>
-            <button onclick="zoomPlot('scatter', 1)" title="Zoom In"><i class="fa-solid fa-search-plus"></i></button>
-            <button onclick="zoomPlot('scatter', -1)" title="Zoom Out"><i class="fa-solid fa-search-minus"></i></button>
-            <label id="scatterZoomVal">100%</label>
-          </div>
-          <div class="plot-area"><div id="scatter"></div></div>
+      <!-- t4: static figures -->
+      <div id="t4" class="tab-content">
+        <div class="section-header">
+          <h2>🖼️ Static figures</h2>
+          <span class="pill">auto-embedded</span>
+        </div>
+        <div class="fig-grid">
+          <div class="fig"><h4>Combined MR scatter</h4><img id="img_scatter_combined" alt="MR_Scatter_Combined"/></div>
+          <div class="fig"><h4>Leave-one-out (IVW)</h4><img id="img_leave_one_out" alt="MR_LeaveOneOut"/></div>
+          <div class="fig"><h4>Method summary</h4><img id="img_summary_est" alt="mr_summary_estimates"/></div>
+          <div class="fig"><h4>Forest (top SNPs)</h4><img id="img_forest_static" alt="ivw_per_snp_forest_plot"/></div>
+          <div class="fig"><h4>Exposure Manhattan</h4><img id="img_man_exp" alt="exposure_manhattan"/></div>
+          <div class="fig"><h4>Outcome Manhattan</h4><img id="img_man_out" alt="outcome_manhattan"/></div>
+          <div class="fig"><h4>Exposure Q-Q</h4><img id="img_qq_exp" alt="exposure_qq"/></div>
+          <div class="fig"><h4>Outcome Q-Q</h4><img id="img_qq_out" alt="outcome_qq"/></div>
         </div>
       </div>
 
-      <div class="tab-content" id="tab3">
-        <div class="section" style="margin:0;">
-          <h2>🌲 Forest Plot of SNP Effects</h2>
-          <div class="plot-toolbar">
-            <button onclick="downloadPlot('forest', 'forest.png', 'png')" title="Download as PNG"><i class="fa-solid fa-image"></i></button>
-            <button onclick="downloadPlot('forest', 'forest.pdf', 'pdf')" title="Download as PDF"><i class="fa-solid fa-file-pdf"></i></button>
-            <button onclick="zoomPlot('forest', 1)" title="Zoom In"><i class="fa-solid fa-search-plus"></i></button>
-            <button onclick="zoomPlot('forest', -1)" title="Zoom Out"><i class="fa-solid fa-search-minus"></i></button>
-            <label id="forestZoomVal">100%</label>
-          </div>
-          <div class="plot-area"><div id="forest"></div></div>
-        </div>
-      </div>
-
-      <!-- Manhattan/QQ Tab -->
-      <div class="tab-content" id="tab4">
-        <div class="section" style="margin:0;">
-          <h2>📈 Manhattan &amp; Q-Q Plots</h2>
-          <div class="plot-area"><div id="manhattan_exposure"></div></div>
-          <div class="plot-area"><div id="manhattan_outcome"></div></div>
-          <div class="plot-area"><div id="qq_exposure"></div></div>
-          <div class="plot-area"><div id="qq_outcome"></div></div>
-        </div>
-      </div>
-
-      <!-- Method Summary Tab -->
-      <div class="tab-content" id="tab5">
-        <div class="section" style="margin:0;">
-          <h2>📋 MR Method Summary</h2>
-          <div class="zoom-slider">
-            <label><i class="fa-solid fa-magnifying-glass"></i> Zoom:</label>
-            <input type="range" min="0.7" max="1.8" value="1" step="0.05" id="methodZoomSlider">
-            <span id="methodZoomVal">1.00×</span>
-          </div>
-          <table id="methodTable" class="display nowrap" style="width:100%;">
+      <!-- t5: method table -->
+      <div id="t5" class="tab-content">
+        <div class="section-header"><h2>📋 Method summary</h2></div>
+        <div class="table-wrap">
+          <table id="methodTable" class="display nowrap compact" style="width:100%">
             <thead>
-              <tr>
-                <th>Method</th>
-                <th>Estimate</th>
-                <th>SE</th>
-                <th>P-value</th>
-                <th>CI Lower</th>
-                <th>CI Upper</th>
-                <th># SNPs</th>
-              </tr>
+              <tr><th>Method</th><th>Estimate</th><th>SE</th><th>p-value</th><th>CI lower</th><th>CI upper</th><th># SNPs</th></tr>
             </thead>
-            <tbody>
-              <!-- METHOD_TABLE_ROWS -->
-            </tbody>
+            <tbody><!-- METHOD_TABLE_ROWS --></tbody>
           </table>
         </div>
       </div>
+
+      <!-- t6: downloads -->
+      <div id="t6" class="tab-content">
+        <div class="section-header"><h2>⬇️ Downloads</h2><span class="pill">CSV exports</span></div>
+        <p style="margin:.2rem 0 0; display:flex; flex-wrap:wrap; gap:8px;">
+          <a href="MR_Formatted_Results.csv" download class="pill">MR_Formatted_Results.csv</a>
+          <a href="MR_IVW_OR_Per_SNP.csv" download class="pill">MR_IVW_OR_Per_SNP.csv</a>
+          <a href="harmonised_data.csv" download class="pill">harmonised_data.csv</a>
+        </p>
+      </div>
     </div>
-    <div class="footer">
-      MR-CoPe Pipeline &mdash; Open Source &mdash; v1.0 &mdash; <a href="mailto:gcc46@bath.ac.uk" style="color:inherit;">Contact Us</a>
-    </div>
+
+    <div class="footer">MR-CoPe — Open Source — v1.0 — <a href="mailto:gcc46@bath.ac.uk" style="color:inherit">Contact</a></div>
   </div>
+
+  <!-- Minimal JS -->
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.5/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.colVis.min.js"></script>
+
   <script>
+    // Date
     document.getElementById("today").textContent = new Date().toLocaleDateString();
-    function toggleTheme() {
-      const root = document.documentElement;
-      const newTheme = root.getAttribute("data-theme") === "light" ? "dark" : "light";
-      root.setAttribute("data-theme", newTheme);
-      localStorage.setItem("mrcope-theme", newTheme);
+
+    function adjustTables(){ setTimeout(()=>{$($.fn.dataTable.tables(true)).DataTable().columns.adjust();},0); }
+
+    // Theme
+    function toggleTheme(){
+      const r=document.documentElement;
+      const t=r.getAttribute("data-theme")==="light"?"dark":"light";
+      r.setAttribute("data-theme",t);
+      localStorage.setItem("mrcope-theme",t);
+      adjustTables();
     }
     (function(){
-      let saved = localStorage.getItem("mrcope-theme");
-      if(saved) document.documentElement.setAttribute("data-theme", saved);
+      const t=localStorage.getItem("mrcope-theme");
+      if(t) document.documentElement.setAttribute("data-theme",t);
     })();
-    document.getElementById("theme-toggle-btn").onclick = toggleTheme;
-    $(document).on("click", ".tab-btn", function(){
-      var tab = $(this).data('tab');
-      $(".tab-btn").removeClass('active');
-      $(this).addClass('active');
-      $(".tab-content").removeClass('active');
-      $("#" + tab).addClass('active');
+    document.getElementById("theme-toggle").onclick = toggleTheme;
+
+    // Tabs
+    $(document).on("click",".tab",function(){
+      const id=$(this).data("tab");
+      $(".tab").removeClass("active"); $(this).addClass("active");
+      $(".tab-content").removeClass("active"); $("#"+id).addClass("active");
+      adjustTables();
     });
-    $(document).ready(function () {
-      let snpTable = $('#snpTable').DataTable({
-        dom: 'Bfrtip',
-        buttons: [
-          {extend: 'csv', text: '<i class="fa-solid fa-download"></i> CSV', className: 'btn-csv'},
-          {extend: 'colvis', text: '<i class="fa-solid fa-table-cells"></i> Columns'}
+
+    // Tables
+    $(document).ready(function(){
+      $('#snpTable').DataTable({
+        dom:'Bfrtip',
+        buttons:[
+          {extend:'csv',text:'<i class="fa-solid fa-download"></i> CSV',className:'btn-csv'},
+          {extend:'colvis',text:'<i class="fa-solid fa-table-cells"></i> Columns'}
         ],
-        scrollX: true,
-        scroller: true,
-        pageLength: 18,
-        lengthMenu: [10, 18, 25, 50, 100],
-        language: {search: "🔍 Search SNPs:"}
+        autoWidth:false,
+        deferRender:true,
+        scrollX:true,
+        // NOTE: scroller removed to avoid giant blank space for small tables
+        paging:true, pageLength:25,
+        lengthMenu:[[10,25,50,100,-1],[10,25,50,100,'All']],
+        language:{search:"🔎 Search SNPs:"},
+        columnDefs:[
+          {targets:[1,2,13,14,15], className:'num'},
+          {targets:'_all', className:'nowrap'}
+        ]
       });
-      $('#tableZoomSlider').on('input', function() {
-        let v = parseFloat(this.value);
-        $('#snpTable').css('font-size', (1.01*v) + 'rem');
-        $('#tableZoomVal').text(v.toFixed(2) + '×');
-      });
-      let methodTable = $('#methodTable').DataTable({
-        dom: 'Bfrtip',
-        buttons: [
-          {extend: 'csv', text: '<i class="fa-solid fa-download"></i> CSV', className: 'btn-csv'},
-          {extend: 'colvis', text: '<i class="fa-solid fa-table-cells"></i> Columns'}
+      $('#methodTable').DataTable({
+        dom:'Bfrtip',
+        buttons:[
+          {extend:'csv',text:'<i class="fa-solid fa-download"></i> CSV',className:'btn-csv'},
+          {extend:'colvis',text:'<i class="fa-solid fa-table-cells"></i> Columns'}
         ],
-        scrollX: true,
-        paging: false,
-        searching: false,
-        info: false
+        autoWidth:false,
+        scrollX:true, paging:false, searching:false, info:false,
+        columnDefs:[{targets:[1,2,3,4,5,6], className:'num'}]
       });
-      $('#methodZoomSlider').on('input', function() {
-        let v = parseFloat(this.value);
-        $('#methodTable').css('font-size', (1.01*v) + 'rem');
-        $('#methodZoomVal').text(v.toFixed(2) + '×');
-      });
+      adjustTables();
+      window.addEventListener('resize', adjustTables);
     });
-    function downloadPlot(id, filename, format) {
-      let plot = document.getElementById(id);
-      Plotly.downloadImage(plot, {format: format, filename: filename.replace(/\.\w+$/,'')});
+
+    /* Static figure src (file paths injected by 07_generate_html_report.py) */
+    const IMG = {
+      scatterCombined: '<!-- SCATTER_COMBINED_SRC -->',
+      leaveOneOut:     '<!-- LOO_SRC -->',
+      summaryEst:      '<!-- SUMMARY_EST_SRC -->',
+      forestStatic:    '<!-- FOREST_STATIC_SRC -->',
+      manExp:          '<!-- MANHATTAN_EXPOSURE_SRC -->',
+      manOut:          '<!-- MANHATTAN_OUTCOME_SRC -->',
+      qqExp:           '<!-- QQ_EXPOSURE_SRC -->',
+      qqOut:           '<!-- QQ_OUTCOME_SRC -->'
+    };
+    function setImg(id, src, title){
+      const el=document.getElementById(id);
+      if(src && src.length){ el.src = src; el.alt = title; }
+      else { el.parentElement.innerHTML = `<div class="fig" style="padding:12px;border:1px dashed var(--border);border-radius:12px;color:#999;text-align:center;">${title} (missing)</div>`; }
     }
-    var plotZoom = {scatter: 1, forest: 1};
-    function zoomPlot(id, direction) {
-      plotZoom[id] = Math.max(0.6, Math.min(2.6, plotZoom[id] + (direction*0.14)));
-      Plotly.relayout(id, { 'width': Math.round(940 * plotZoom[id]), 'height': Math.round(470 * plotZoom[id]) });
-      document.getElementById(id+"ZoomVal").textContent = Math.round(plotZoom[id]*100)+"%";
-    }
-    Plotly.newPlot('scatter', [{x: [1,2,3], y: [4,5,6], type: 'scatter', mode: 'markers', marker: {size: 14}}], {responsive:true, margin: {t: 30}});
-    Plotly.newPlot('forest', [{type: 'bar', x: [0.8, 1.2, 1.1], y: ['rs123', 'rs456', 'rs789'], orientation: 'h'}], {responsive:true, margin: {t: 30}});
-    Plotly.newPlot('manhattan_exposure', [{x:[1,2,3],y:[2,3,4],type:'scatter',mode:'markers'}], {responsive:true, title:"Exposure Manhattan"});
-    Plotly.newPlot('manhattan_outcome', [{x:[1,2,3],y:[3,2,1],type:'scatter',mode:'markers'}], {responsive:true, title:"Outcome Manhattan"});
-    Plotly.newPlot('qq_exposure', [{x:[0,1,2],y:[0,1,2],type:'scatter',mode:'markers'}], {responsive:true, title:"Exposure Q-Q"});
-    Plotly.newPlot('qq_outcome', [{x:[0,1,2],y:[2,1,0],type:'scatter',mode:'markers'}], {responsive:true, title:"Outcome Q-Q"});
+    setImg('img_scatter_combined', IMG.scatterCombined, 'MR_Scatter_Combined.png');
+    setImg('img_leave_one_out',    IMG.leaveOneOut,     'MR_LeaveOneOut.png');
+    setImg('img_summary_est',      IMG.summaryEst,      'mr_summary_estimates.png');
+    setImg('img_forest_static',    IMG.forestStatic,    'ivw_per_snp_forest_plot.png');
+    setImg('img_man_exp',          IMG.manExp,          'exposure_manhattan.png');
+    setImg('img_man_out',          IMG.manOut,          'outcome_manhattan.png');
+    setImg('img_qq_exp',           IMG.qqExp,           'exposure_qq.png');
+    setImg('img_qq_out',           IMG.qqOut,           'outcome_qq.png');
   </script>
 </body>
 </html>
