@@ -17,7 +17,37 @@ Description:
 import sys
 import os
 import pandas as pd
+import matplotlib as mpl
 import matplotlib.pyplot as plt
+
+# =========================
+# Global visual aesthetics
+# =========================
+mpl.rcParams.update({
+    "figure.dpi": 150,
+    "savefig.dpi": 300,
+    "font.size": 11,
+    "font.family": "DejaVu Sans",
+    "axes.titlesize": 14,
+    "axes.labelsize": 12,
+    "axes.linewidth": 1.0,
+    "xtick.labelsize": 10,
+    "ytick.labelsize": 9,
+    "legend.frameon": False,
+    "axes.spines.top": False,
+    "axes.spines.right": False,
+    "grid.color": "0.85",
+    "grid.linestyle": "-",
+    "grid.linewidth": 0.8,
+})
+
+# Subtle, colorblind-friendly palette
+COL_POINT = "#2B6CB0"   # blue for method points
+COL_CI    = "#4A5568"   # slate/gray for CIs
+COL_REF   = "#A0AEC0"   # reference line
+COL_POS   = "#2F855A"   # green (OR>1)
+COL_NEG   = "#C53030"   # red (OR<1)
+COL_BAND  = "#F7FAFC"   # banding in forest plot
 
 
 def validate_inputs(paths, labels):
@@ -72,20 +102,37 @@ def main():
     # --- Plot Method-level Summary --- #
     print("📊 Creating method-level summary plot...")
 
-    plt.figure(figsize=(10, 6), dpi=300)
+    fig, ax = plt.subplots(figsize=(10, 6), dpi=300)
+    ax.grid(axis="y")
+
     x = range(len(methods))
-    yerr = [[OR - low for OR, low in zip(ORs, Lower)],
-            [up - OR for OR, up in zip(ORs, Upper)]]
+    yerr = [
+        [OR - low for OR, low in zip(ORs, Lower)],
+        [up - OR for OR, up in zip(ORs, Upper)]
+    ]
 
-    plt.errorbar(x, ORs, yerr=yerr, fmt='o', color='black', capsize=5, markersize=8, linewidth=2)
-    plt.axhline(y=1, linestyle='--', color='gray', linewidth=1.5)
-    plt.xticks(x, methods, fontsize=12, fontweight='bold')
-    plt.ylabel("Odds Ratio (95% CI)", fontsize=13)
-    plt.title("MR Effect Estimates", fontsize=16, fontweight='bold', pad=15)
+    # Draw CIs and then points (cleaner layering)
+    ax.errorbar(x, ORs, yerr=yerr, fmt="none", ecolor=COL_CI, elinewidth=2, capsize=6, zorder=1, label="95% CI")
+    ax.scatter(x, ORs, s=60, color=COL_POINT, zorder=2, label="Point estimate")
+
+    # Reference line at null
+    ax.axhline(y=1, linestyle='--', color=COL_REF, linewidth=1.2, zorder=0)
+
+    ax.set_xticks(list(x), methods)
+    ax.set_ylabel("Odds Ratio (95% CI)")
+    ax.set_title("MR Effect Estimates")
+
+    # Gentle y padding
+    ymin = min(Lower) - 0.05
+    ymax = max(Upper) + 0.05
+    ax.set_ylim(ymin, ymax)
+
+    # Minimal legend (since we keep labels off the figure)
+    ax.legend(loc="upper left", ncols=2, frameon=False)
+
     plt.tight_layout()
-
     output_path1 = os.path.join(output_dir, "mr_summary_estimates.png")
-    plt.savefig(output_path1, dpi=300)
+    plt.savefig(output_path1, dpi=300, bbox_inches="tight")
     plt.close()
     print(f"✅ Saved: {output_path1}\n")
 
@@ -106,26 +153,49 @@ def main():
 
     top_snp_df = snp_df.nlargest(30, "IVW_OR").copy().sort_values("IVW_OR", ascending=False).reset_index(drop=True)
 
-    plt.figure(figsize=(8, 0.35 * len(top_snp_df) + 2), dpi=300)
-    y = range(len(top_snp_df))
+    fig, ax = plt.subplots(figsize=(8, 0.35 * len(top_snp_df) + 2), dpi=300)
 
-    plt.errorbar(
+    y = list(range(len(top_snp_df)))
+
+    # Alternating bands to guide the eye
+    for i in y:
+        if i % 2 == 0:
+            ax.axhspan(i - 0.5, i + 0.5, color=COL_BAND, zorder=0)
+
+    # CI lines (horizontal) and points colored by direction vs null
+    ax.errorbar(
         top_snp_df["IVW_OR"], y,
         xerr=[
             top_snp_df["IVW_OR"] - top_snp_df["Lower_CI"],
             top_snp_df["Upper_CI"] - top_snp_df["IVW_OR"]
         ],
-        fmt='o', color='black', ecolor='gray', elinewidth=1.5, capsize=3
+        fmt='none', ecolor=COL_CI, elinewidth=2, capsize=3, zorder=1
     )
 
-    plt.axvline(x=1, linestyle="--", color="gray")
-    plt.yticks(y, top_snp_df["SNP"], fontsize=8)
-    plt.xlabel("IVW Odds Ratio (95% CI)", fontsize=12)
-    plt.title("Top 30 SNPs by IVW OR", fontsize=14, fontweight="bold")
-    plt.tight_layout()
+    colors = (top_snp_df["IVW_OR"] >= 1).map({True: COL_POS, False: COL_NEG}).values
+    ax.scatter(top_snp_df["IVW_OR"], y, s=40, color=colors, zorder=2)
 
+    # Reference line
+    ax.axvline(x=1, linestyle="--", color=COL_REF, linewidth=1.2, zorder=0)
+
+    ax.set_yticks(y, top_snp_df["SNP"])
+    ax.set_xlabel("IVW Odds Ratio (95% CI)")
+    ax.set_title("Top 30 SNPs by IVW OR")
+
+    # Tidy x-limits with small padding
+    xmin = float((top_snp_df["IVW_OR"] - (top_snp_df["IVW_OR"] - top_snp_df["Lower_CI"])).min())
+    xmax = float((top_snp_df["IVW_OR"] + (top_snp_df["Upper_CI"] - top_snp_df["IVW_OR"])).max())
+    xmin = min(top_snp_df["Lower_CI"].min(), xmin)
+    xmax = max(top_snp_df["Upper_CI"].max(), xmax)
+    xpad = (xmax - xmin) * 0.05 if xmax > xmin else 0.1
+    ax.set_xlim(left=max(0.5, xmin - xpad), right=xmax + xpad)
+
+    ax.tick_params(axis="y", pad=4)
+    ax.grid(axis="x")
+
+    plt.tight_layout()
     output_path2 = os.path.join(output_dir, "ivw_per_snp_forest_plot.png")
-    plt.savefig(output_path2, dpi=300)
+    plt.savefig(output_path2, dpi=300, bbox_inches="tight")
     plt.close()
     print(f"✅ Saved: {output_path2}\n")
 
