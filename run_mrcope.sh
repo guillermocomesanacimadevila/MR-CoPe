@@ -35,6 +35,57 @@ echo ""
 echo -e "${GRN}🧬 Welcome to MR-CoPe: Mendelian Randomisation Pipeline${NC}"
 echo "--------------------------------------------------------"
 
+# --- Docker runtime helpers (daemon up / start if needed) ---
+docker_running() {
+  docker info >/dev/null 2>&1
+}
+
+start_docker_if_needed() {
+  if docker_running; then
+    echo -e "${GRN}✅ Docker daemon is running.${NC}"
+    return 0
+  fi
+  echo -e "${YEL}🟡 Docker is installed but not running. Attempting to start it...${NC}"
+  if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    if command -v systemctl >/dev/null 2>&1; then
+      sudo systemctl start docker || true
+    fi
+  elif [[ "$OSTYPE" == "darwin"* ]]; then
+    # Start Docker Desktop (no error if already running)
+    open -ga Docker || open -a Docker || true
+  fi
+  # Wait up to ~2 minutes for the daemon to come up
+  for _ in {1..60}; do
+    if docker_running; then
+      echo -e "${GRN}✅ Docker daemon started.${NC}"
+      return 0
+    fi
+    sleep 2
+  done
+  echo -e "${RED}❌ Docker is not running and could not be started automatically. Please start Docker and re-run.${NC}"
+  exit 1
+}
+
+# --- macOS: ensure Docker CLI on PATH if Docker Desktop is installed ---
+ensure_docker_cli_macos() {
+  local candidates=(
+    "/Applications/Docker.app/Contents/Resources/bin"
+    "$HOME/Applications/Docker.app/Contents/Resources/bin"
+    "/opt/homebrew/bin"
+    "/usr/local/bin"
+  )
+  for d in "${candidates[@]}"; do
+    if [[ -x "$d/docker" ]]; then
+      case ":$PATH:" in
+        *":$d:"*) : ;;
+        *) export PATH="$d:$PATH" ;;
+      esac
+      return 0
+    fi
+  done
+  return 1
+}
+
 # --- Enforce running from script dir ---
 MYDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ "$PWD" != "$MYDIR" ]]; then
@@ -74,6 +125,13 @@ export FZF_DEFAULT_OPTS="--layout=default --border ${FZF_DEFAULT_OPTS}"
 install_msg() { echo -e "${YEL}🔧 $1${NC}"; }
 
 # -------- Docker check/install ---------
+# On macOS, try to discover the Docker CLI even if it's not on PATH
+if [[ "$OSTYPE" == "darwin"* ]] && ! command -v docker >/dev/null 2>&1; then
+  if ensure_docker_cli_macos && command -v docker >/dev/null 2>&1; then
+    echo -e "${GRN}✅ Found Docker CLI via Docker.app.${NC}"
+  fi
+fi
+
 if ! command -v docker &> /dev/null; then
     install_msg "Docker not found. Attempting to install Docker..."
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
@@ -95,6 +153,9 @@ if ! command -v docker &> /dev/null; then
 else
     echo -e "${GRN}✅ Docker is installed.${NC}"
 fi
+
+# Ensure Docker daemon is up (Desktop/Service running) before proceeding
+start_docker_if_needed
 
 # -------- Java check/install (needed for Nextflow) ---------
 if ! command -v java &> /dev/null; then
@@ -381,7 +442,7 @@ with (open_vcf(vcf_path, 'rt')) as vcf_in, open(csv_path, 'w', newline='') as cs
                              "BETA": stats["BETA"], "SE": stats["SE"], "PVALUE": stats["PVALUE"], "EAF": stats["EAF"]})
             rows += 1
         except Exception as e:
-            print(f"⚠️ Skipping line at position {pos}: {e}", file=sys.stderr)
+          print(f"⚠️ Skipping line at position {pos}: {e}", file=sys.stderr)
     print(rows, file=sys.stderr)
 EOF
   NROWS=$(awk 'END{print NR-1}' ./tmp_outcome.csv)
@@ -601,3 +662,24 @@ echo -e "📦 Results are available in: ${YEL}./results/${NC}"
 echo -e "🔍 Review the HTML report or output files for your MR results."
 echo -e "${YEL}💡 See filter_summary.csv and parameter_log.txt for reproducibility & filtering stats.${NC}"
 echo "--------------------------------------------------------"
+
+# --- Auto-open HTML report (best effort) ---
+FIND_BIN="find"; command -v gfind >/dev/null 2>&1 && FIND_BIN="gfind"
+# Try to locate the most recent HTML report in ./results (including subfolders)
+REPORT_FILE="$(
+  if [[ "$FIND_BIN" = "gfind" ]]; then
+    $FIND_BIN ./results -type f -iname '*.html' -printf '%T@ %p\n' 2>/dev/null | sort -nr | awk 'NR==1{$1=""; sub(/^ /,""); print}'
+  else
+    ls -t ./results/*.html 2>/dev/null | head -n1
+  fi
+)"
+if [[ -n "$REPORT_FILE" && -f "$REPORT_FILE" ]]; then
+  echo -e "${GRN}📖 Opening report:${NC} $REPORT_FILE"
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    open "$REPORT_FILE" >/dev/null 2>&1 || true
+  elif command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "$REPORT_FILE" >/dev/null 2>&1 || true
+  fi
+else
+  echo -e "${YEL}ℹ️  No HTML report found to open automatically.${NC}"
+fi
