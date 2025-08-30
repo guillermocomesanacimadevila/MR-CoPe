@@ -86,7 +86,7 @@ def load_gwas(path, label):
     print(f"📅 Loading {label} GWAS: {path}")
     sep = "\t" if path.endswith((".tsv", ".txt")) else ","
     df = pd.read_csv(path, sep=sep)
-    df.columns = df.columns.str.strip().str.upper()  # <<< FIXED HERE
+    df.columns = df.columns.str.strip().str.upper()
     print(f"✅ Loaded {label} GWAS | Shape: {df.shape}\n")
 
     mapping = auto_map_columns(df, label)
@@ -102,11 +102,23 @@ def load_gwas(path, label):
             if std_col != actual_col:
                 df.rename(columns={actual_col: std_col}, inplace=True)
 
-    if "BETA" in df.columns and "SE" in df.columns and "PVALUE" not in df.columns:
-        print("🧠 Computing PVALUE from BETA and SE...")
-        df["Z"] = df["BETA"] / df["SE"]
-        df["PVALUE"] = 2 * norm.sf(np.abs(df["Z"]))
+    # --- Ensure numeric types ---
+    if "BETA" in df.columns:
+        df["BETA"] = pd.to_numeric(df["BETA"], errors="coerce")
+    if "PVALUE" in df.columns:
+        df["PVALUE"] = pd.to_numeric(df["PVALUE"], errors="coerce")
 
+    # --- Infer SE if missing and possible ---
+    if "SE" not in df.columns:
+        if "BETA" in df.columns and "PVALUE" in df.columns:
+            print(f"🧠 Inferring SE for {label} from BETA and PVALUE...")
+            z_scores = norm.ppf(1 - df["PVALUE"] / 2)
+            df["SE"] = df["BETA"].abs() / z_scores.replace([np.inf, np.nan], np.nan)
+            print(f"✅ SE calculated for {df['SE'].notna().sum()} SNPs.")
+        else:
+            print(f"⚠️ Cannot infer SE for {label}: missing BETA or PVALUE columns.")
+
+    df.dropna(subset=["SNP", "BETA", "PVALUE"], inplace=True)
     return df
 
 def qc_report(df, label):
