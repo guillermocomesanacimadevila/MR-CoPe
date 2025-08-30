@@ -193,12 +193,19 @@ def main():
     print(f"📏 Exposure after F-stat filtering: {exposure.shape}")
     print(f"📏 Outcome after F-stat filtering: {outcome.shape}\n")
 
+    # ---- Merge & Capitalize columns ----
     merged = pd.merge(exposure, outcome, on="SNP", suffixes=("_exp", "_out"))
+    merged.columns = [col.upper() for col in merged.columns]  # R/TwoSampleMR expects uppercase!
 
-    if "riskFrequency_exp" in merged.columns:
-        merged.rename(columns={"riskFrequency_exp": "EAF_exp"}, inplace=True)
-    if "riskFrequency_out" in merged.columns:
-        merged.rename(columns={"riskFrequency_out": "EAF_out"}, inplace=True)
+    # ---- Ensure EAF columns exist for downstream analysis ----
+    if "EAF_EXP" not in merged.columns:
+        merged["EAF_EXP"] = pd.NA
+    if "EAF_OUT" not in merged.columns:
+        merged["EAF_OUT"] = pd.NA
+
+    # For maximum compatibility with R code that may expect eaf/eaf.outcome (MR-Base etc)
+    merged['EAF'] = merged['EAF_EXP']
+    merged['EAF.OUTCOME'] = merged['EAF_OUT']
 
     print(f"🔀 Final merged dataset shape: {merged.shape}\n")
     merged.to_csv(output_path, index=False)
