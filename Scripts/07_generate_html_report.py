@@ -7,11 +7,13 @@ import pandas as pd
 # ------------------------------------------------------------------
 # Usage:
 #   07_generate_html_report.py <MR_Formatted_Results.csv>
-#                               <MR_IVW_OR_Per_SNP.csv>
-#                               <template.html>
-#                               <out.html>
+#                              <MR_IVW_OR_Per_SNP.csv>
+#                              <template.html>
+#                              <out.html>
 #
-# Assumes: harmonised_data.csv is in CWD (staged by Nextflow).
+# Assumes: harmonised_data.csv and ld_pruned_SNPs.csv are in CWD.
+#          Optionally reads mr_presso_summary.csv and mr_presso_outliers.csv
+#          and will embed them if present/non-empty.
 # ------------------------------------------------------------------
 
 if len(sys.argv) != 5:
@@ -36,6 +38,11 @@ def read_csv_safe(path):
 summary   = read_csv_safe(summary_csv)
 snps_ivw  = read_csv_safe(snps_csv)
 harm      = read_csv_safe("harmonised_data.csv")
+ld_pruned = read_csv_safe("ld_pruned_SNPs.csv")  # for F-stat column
+
+# Optional MR-PRESSO outputs
+presso_summary  = read_csv_safe("mr_presso_summary.csv")
+presso_outliers = read_csv_safe("mr_presso_outliers.csv")
 
 # ----------------------------- formatters -----------------------------
 DASH = "—"
@@ -76,14 +83,12 @@ def ci_str(l, u, dash=DASH):
 
 # ----------------------------- column picking -----------------------------
 def pick(cols, *cands):
-    """Return first existing column (case-sensitive) from candidates."""
     for c in cands:
         if c in cols:
             return c
     return None
 
 def pick_ci(df, *cands):
-    """Case-insensitive column picker -> actual column name or None."""
     if df is None or df.empty:
         return None
     low = {c.lower(): c for c in df.columns}
@@ -103,12 +108,17 @@ def get_val(df, row, *aliases):
 N_SNPs = None
 c_n = pick_ci(summary, "N_SNPs", "N", "Num_SNPs")
 if c_n:
-    try: N_SNPs = int(row.get(c_n))
-    except Exception: N_SNPs = None
+    try:
+        N_SNPs = int(row.get(c_n))
+    except Exception:
+        N_SNPs = None
 if N_SNPs is None:
-    if not snps_ivw.empty and pick_ci(snps_ivw, "SNP"): N_SNPs = snps_ivw.shape[0]
-    elif not harm.empty and pick_ci(harm, "SNP", "rsid", "ID"): N_SNPs = harm.shape[0]
-    else: N_SNPs = 0
+    if not snps_ivw.empty and pick_ci(snps_ivw, "SNP"):
+        N_SNPs = snps_ivw.shape[0]
+    elif not harm.empty and pick_ci(harm, "SNP", "rsid", "ID"):
+        N_SNPs = harm.shape[0]
+    else:
+        N_SNPs = 0
 QC_pass = N_SNPs
 
 # IVW fields
@@ -174,6 +184,51 @@ EG_QP_f  = fmt_p(EG_QP)
 EG_I2_f  = fmt_float(EG_I2, 1) if EG_I2 is not None else DASH
 EG_INT_P_f = fmt_p(EG_INT_P)
 
+# ----------------------------- F-stat map (robust) -----------------------------
+def norm_id(x):
+    try:
+        return str(x).strip().upper()
+    except Exception:
+        return None
+
+f_map = {}
+
+# 1) Prefer F from ld_pruned_SNPs.csv if present
+if not ld_pruned.empty:
+    c_snp_ld = next((c for c in ld_pruned.columns if c.lower() in ("snp","rsid","id")), None)
+    c_f      = next((c for c in ld_pruned.columns if c.lower() in ("f_stat","fstat","f")), None)
+    if c_snp_ld and c_f:
+        for _, r in ld_pruned[[c_snp_ld, c_f]].dropna().iterrows():
+            key = norm_id(r[c_snp_ld])
+            try:
+                f_map[key] = float(r[c_f])
+            except Exception:
+                pass
+
+# 2) Fallback: compute F = (beta_x / se_x)^2 from harmonised if missing
+def pick_col(df, *cands):
+    for c in cands:
+        if c in df.columns:
+            return c
+    return None
+
+if not harm.empty:
+    bx_col = pick_col(harm, "beta.exposure", "BETA.exposure", "BETA_EXP", "b.exposure", "b_exp")
+    sx_col = pick_col(harm, "se.exposure",   "SE.exposure",   "SE_EXP",   "se.exposure", "se_exp")
+    snp_col = pick_col(harm, "SNP", "rsid", "ID")
+    if bx_col and sx_col and snp_col:
+        harm_sub = harm[[snp_col, bx_col, sx_col]].dropna().copy()
+        harm_sub["__SNP_KEY__"] = harm_sub[snp_col].map(norm_id)
+        with pd.option_context('mode.use_inf_as_na', True):
+            harm_sub["__F__"] = (harm_sub[bx_col] / harm_sub[sx_col]) ** 2
+        for _, r in harm_sub.dropna(subset=["__SNP_KEY__", "__F__"]).iterrows():
+            key = r["__SNP_KEY__"]
+            if key and key not in f_map:  # don't overwrite ld_pruned values
+                try:
+                    f_map[key] = float(r["__F__"])
+                except Exception:
+                    pass
+
 # ----------------------------- SNP table -----------------------------
 snp_rows_html = []
 
@@ -221,14 +276,17 @@ def snp_rows_from_harmonised(harm_df, ivw_df):
 
     if not (c_id and c_bx and c_by):
         rows.append(
-            "<tr><td colspan='17' style='text-align:center;color:#a00'>"
+            "<tr><td colspan='18' style='text-align:center;color:#a00'>"
             "harmonised_data.csv is present but missing required columns to build the SNP table."
             "</td></tr>"
         )
         return rows
 
     for _, r in harm_df.iterrows():
-        snp = str(r[c_id])
+        snp_raw = r[c_id]
+        snp_key = norm_id(snp_raw)
+        snp = str(snp_raw)
+
         CHR = r[c_chr] if c_chr else DASH
         BP  = r[c_bp]  if c_bp  else DASH
 
@@ -248,7 +306,12 @@ def snp_rows_from_harmonised(harm_df, ivw_df):
         eafx = fmt_float(r[c_eafx], 4) if c_eafx else DASH
         eafy = fmt_float(r[c_eafy], 4) if c_eafy else DASH
 
+        # IVW OR + CI (if available)
         or_val, or_ci = or_map.get(snp, (DASH, DASH))
+
+        # F-stat from map (ld_pruned preferred; else computed)
+        f_val = f_map.get(snp_key)
+        f_val_fmt = fmt_float(f_val, 1) if f_val is not None else DASH
 
         rows.append(
             "<tr>"
@@ -258,6 +321,7 @@ def snp_rows_from_harmonised(harm_df, ivw_df):
             f"<td>{bx}</td><td>{sx}</td><td>{px}</td>"
             f"<td>{by}</td><td>{sy}</td><td>{py}</td>"
             f"<td>{eafx}</td><td>{eafy}</td>"
+            f"<td>{f_val_fmt}</td>"
             f"<td>{or_val}</td><td>{or_ci}</td>"
             "</tr>"
         )
@@ -267,7 +331,7 @@ if not harm.empty:
     snp_rows_html = snp_rows_from_harmonised(harm, snps_ivw)
 else:
     snp_rows_html = [
-        "<tr><td colspan='17' style='text-align:center;color:#a00'>"
+        "<tr><td colspan='18' style='text-align:center;color:#a00'>"
         "harmonised_data.csv not found — SNP table not available."
         "</td></tr>"
     ]
@@ -281,6 +345,56 @@ method_rows = [
     f"<tr><td>MR Egger</td><td>{EG_OR_f}</td><td>{EG_CI_f}</td><td>{EG_P_f}</td>"
     f"<td>{EG_Q_f}</td><td>{EG_QP_f}</td><td>{EG_I2_f}</td><td>{EG_INT_P_f}</td></tr>",
 ]
+
+# ----------------------------- MR-PRESSO block -----------------------------
+PRESSO_GLOBAL_P_f = DASH
+PRESSO_N_OUT_f     = DASH
+PRESSO_DIST_P_f    = DASH
+PRESSO_IVW_OR_f    = DASH
+PRESSO_IVW_CI_f    = DASH
+PRESSO_IVW_P_f     = DASH
+PRESSO_DELTA_f     = DASH
+
+# Read summary row (first row expected)
+if not presso_summary.empty:
+    rs = presso_summary.iloc[0]
+    def g(*names):
+        c = pick_ci(presso_summary, *names)
+        return rs.get(c) if c else None
+    PRESSO_GLOBAL_P_f = fmt_p(g("global_p", "Global_P", "Global.p"))
+    try:
+        n_out = g("n_outliers", "N_Outliers", "Nout")
+        PRESSO_N_OUT_f = str(int(n_out)) if not _is_na(n_out) else DASH
+    except Exception:
+        PRESSO_N_OUT_f = DASH
+    PRESSO_DIST_P_f  = fmt_p(g("distortion_p", "Distortion_P", "Distortion.p"))
+
+    or_adj = g("ivw_presso_or", "IVW_Presso_OR", "OR_adj")
+    ci_l   = g("ivw_presso_ci_l", "IVW_Presso_CI_L", "CI_L_adj")
+    ci_u   = g("ivw_presso_ci_u", "IVW_Presso_CI_U", "CI_U_adj")
+    p_adj  = g("ivw_presso_p", "IVW_Presso_P", "P_adj")
+    delta  = g("delta_or_vs_ivw", "Delta_OR_vs_IVW", "Delta")
+
+    PRESSO_IVW_OR_f = fmt_float(or_adj, 3)
+    PRESSO_IVW_CI_f = ci_str(ci_l, ci_u)
+    PRESSO_IVW_P_f  = fmt_p(p_adj)
+    PRESSO_DELTA_f  = (fmt_float(delta, 3) if delta is not None and not _is_na(delta) else DASH)
+
+# Outliers table rows
+presso_outlier_rows = []
+if not presso_outliers.empty and pick_ci(presso_outliers, "SNP"):
+    c_snp = pick_ci(presso_outliers, "SNP")
+    c_rss = pick_ci(presso_outliers, "RSSobs", "RSS_obs", "rssobs")
+    c_p   = pick_ci(presso_outliers, "p_value", "p", "P")
+    for _, r in presso_outliers.iterrows():
+        snp = r.get(c_snp, "")
+        rss = fmt_float(r.get(c_rss), 3) if c_rss else DASH
+        pv  = fmt_p(r.get(c_p)) if c_p else DASH
+        presso_outlier_rows.append(f"<tr><td>{snp}</td><td class='num'>{rss}</td><td class='num'>{pv}</td></tr>")
+else:
+    presso_outlier_rows.append(
+        "<tr><td colspan='3' style='text-align:center;color:#777'>No outliers detected</td></tr>"
+    )
 
 # ----------------------------- Template injection -----------------------------
 with open(html_template, "r", encoding="utf-8") as f:
@@ -313,6 +427,7 @@ repls = {
     "<!-- SNP_TABLE_ROWS -->":    "\n".join(snp_rows_html),
     "<!-- METHOD_TABLE_ROWS -->": "\n".join(method_rows),
 
+    # Static figures (existing)
     "<!-- SCATTER_COMBINED_SRC -->":   "MR_Scatter_Combined.png",
     "<!-- LOO_SRC -->":                "MR_LeaveOneOut.png",
     "<!-- SUMMARY_EST_SRC -->":        "mr_summary_estimates.png",
@@ -321,7 +436,22 @@ repls = {
     "<!-- MANHATTAN_OUTCOME_SRC -->":  "outcome_manhattan.png",
     "<!-- QQ_EXPOSURE_SRC -->":        "exposure_qq.png",
     "<!-- QQ_OUTCOME_SRC -->":         "outcome_qq.png",
+    "<!-- FSTAT_HIST_SRC -->":         "Fstat_Histogram.png",
+    "<!-- FSTAT_DENSITY_SRC -->":      "Fstat_Density.png",
+    "<!-- FUNNEL_SRC -->":             "Funnel_Plot.png",
+
+    # MR-PRESSO placeholders
+    "<!-- PRESSO_GLOBAL_P -->": PRESSO_GLOBAL_P_f,
+    "<!-- PRESSO_N_OUT -->":    PRESSO_N_OUT_f,
+    "<!-- PRESSO_DIST_P -->":   PRESSO_DIST_P_f,
+    "<!-- PRESSO_IVW_OR -->":   PRESSO_IVW_OR_f,
+    "<!-- PRESSO_IVW_CI -->":   PRESSO_IVW_CI_f,
+    "<!-- PRESSO_IVW_P -->":    PRESSO_IVW_P_f,
+    "<!-- PRESSO_DELTA -->":    PRESSO_DELTA_f,
+    "<!-- PRESSO_OUTLIER_ROWS -->": "\n".join(presso_outlier_rows),
+    "<!-- PRESSO_PLOT_SRC -->": "mr_presso_outlier_plot.png",
 }
+
 for k, v in repls.items():
     html = html.replace(k, v)
 
