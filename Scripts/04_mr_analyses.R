@@ -2,38 +2,54 @@
 
 # ================================================================
 # MR-CoPe | Mendelian Randomisation Analysis using TwoSampleMR
+# + MR-PRESSO integration (https://github.com/rondolab/MR-PRESSO)
 # ================================================================
-# Author: Guillermo Comesaña & Christian Pepler
-#
 # Usage:
 #   Rscript 04_mr_analyses.R <input_ld_pruned_snps.csv>
 #
-# Description:
-#   Performs MR analyses (IVW, Egger, Weighted Median) on LD-pruned,
-#   harmonised GWAS summary statistics.
+# Inputs:
+#   - <input_ld_pruned_snps.csv>: output of LD step (or no-LD copy)
 #
 # Outputs:
-# - exposure_dat.csv
-# - outcome_dat.csv
-# - harmonised_data.csv
-# - MR_Formatted_Results.csv
-# - MR_IVW_OR_Per_SNP.csv
+#   - exposure_dat.csv
+#   - outcome_dat.csv
+#   - harmonised_data.csv
+#   - MR_Formatted_Results.csv          (now includes PRESSO fields)
+#   - MR_IVW_OR_Per_SNP.csv
+#   - MR_PRESSO_Summary.csv             (Global p, #outliers, Distortion p)
+#   - MR_PRESSO_Outliers.csv            (list of outlier SNPs; empty if none)
+#   - (optional) MR_PRESSO_Outlier_Plot.png (placeholder plot if outliers)
 # ================================================================
 
 # ---- Required Libraries (with auto-install) ----
 install_if_missing <- function(pkg, repo = "https://cloud.r-project.org") {
-  if (!requireNamespace(pkg, quietly = TRUE)) install.packages(pkg, repos = repo)
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    install.packages(pkg, repos = repo)
+  }
 }
-install_if_missing("nloptr"); install_if_missing("lme4"); install_if_missing("meta")
-install_if_missing("remotes"); install_if_missing("dplyr"); install_if_missing("readr")
-install_if_missing("tibble");  install_if_missing("tidyr")
 
+install_if_missing("nloptr")
+install_if_missing("lme4")
+install_if_missing("meta")
+install_if_missing("remotes")
+install_if_missing("dplyr")
+install_if_missing("readr")
+install_if_missing("tibble")
+install_if_missing("tidyr")
+
+# TwoSampleMR (use CRAN if available, else GitHub)
 if (!requireNamespace("TwoSampleMR", quietly = TRUE)) {
   remotes::install_github("MRCIEU/TwoSampleMR", upgrade = "never", lib = .libPaths()[1])
 }
 
+# MR-PRESSO (GitHub)
+if (!requireNamespace("MRPRESSO", quietly = TRUE)) {
+  remotes::install_github("rondolab/MR-PRESSO", upgrade = "never", lib = .libPaths()[1])
+}
+
 suppressPackageStartupMessages({
   library(TwoSampleMR)
+  library(MRPRESSO)
   library(dplyr)
   library(readr)
   library(tibble)
@@ -46,7 +62,7 @@ if (length(args) != 1) stop("Usage: Rscript 04_mr_analyses.R <input_ld_pruned_sn
 input_file <- args[1]
 
 cat("\n==============================================================\n")
-cat("MR-CoPe | Mendelian Randomisation Analysis\n")
+cat("MR-CoPe | Mendelian Randomisation Analysis (+ MR-PRESSO)\n")
 cat("==============================================================\n\n")
 
 # ---- guard empty ----
@@ -58,6 +74,9 @@ if (!file.exists(input_file) || file.info(input_file)$size == 0) {
   write.csv(empty_df, "exposure_dat.csv", row.names = FALSE)
   write.csv(empty_df, "outcome_dat.csv", row.names = FALSE)
   write.csv(empty_df, "harmonised_data.csv", row.names = FALSE)
+  write.csv(tibble(GlobalTest_P=NA_real_, NbOutliers=NA_integer_, Distortion_P=NA_real_),
+            "MR_PRESSO_Summary.csv", row.names = FALSE)
+  write.csv(data.frame(), "MR_PRESSO_Outliers.csv", row.names = FALSE)
   quit(status = 0)
 }
 
@@ -118,6 +137,9 @@ if (nrow(harm) == 0) {
   empty_df <- data.frame()
   write.csv(empty_df, "MR_Formatted_Results.csv", row.names = FALSE)
   write.csv(empty_df, "MR_IVW_OR_Per_SNP.csv", row.names = FALSE)
+  write.csv(tibble(GlobalTest_P=NA_real_, NbOutliers=NA_integer_, Distortion_P=NA_real_),
+            "MR_PRESSO_Summary.csv", row.names = FALSE)
+  write.csv(data.frame(), "MR_PRESSO_Outliers.csv", row.names = FALSE)
   quit(status = 0)
 }
 
@@ -161,7 +183,6 @@ if (!ok) {
            is.finite(se_be), is.finite(bo), is.finite(se_bo))
 
   b  <- hd$bo / hd$be
-  # FIXED LINE (balanced parentheses):
   se <- sqrt((hd$se_bo^2 / (hd$be^2)) + ((hd$bo^2) * (hd$se_be^2) / (hd$be^4)))
 
   per_snp_or <- tibble(
@@ -173,7 +194,7 @@ if (!ok) {
 }
 write.csv(per_snp_or, "MR_IVW_OR_Per_SNP.csv", row.names = FALSE)
 
-# ---- Summary table ----
+# ---- Build core summary (IVW / WM / Egger) ----
 get_row <- function(d, m) d %>% filter(method == m)
 safe_exp <- function(x) if (!length(x)) NA_real_ else exp(x)
 safe_ci  <- function(b, se) if (!length(b) || !length(se)) c(NA_real_, NA_real_) else c(b + qnorm(.025)*se, b + qnorm(.975)*se)
@@ -215,9 +236,125 @@ results <- tibble(
   }
 )
 
+# ---- MR-PRESSO (pleiotropy / outlier correction) ----
+presso_summary <- tibble(
+  GlobalTest_P   = NA_real_,
+  NbOutliers     = NA_integer_,
+  Distortion_P   = NA_real_
+)
+
+presso_adj <- tibble(
+  IVW_OR_PressoAdj    = NA_real_,
+  IVW_CI_L_PressoAdj  = NA_real_,
+  IVW_CI_U_PressoAdj  = NA_real_,
+  IVW_P_PressoAdj     = NA_real_
+)
+
+try({
+  # run only if enough SNPs and required columns for PRESSO exist
+  if (nrow(harm) >= 4 &&
+      all(c("beta.outcome","beta.exposure","se.outcome","se.exposure") %in% names(harm))) {
+    set.seed(1234)
+    pr <- mr_presso(
+      BetaOutcome     = "beta.outcome",
+      BetaExposure    = "beta.exposure",
+      SdOutcome       = "se.outcome",
+      SdExposure      = "se.exposure",
+      OUTLIERtest     = TRUE,
+      DISTORTIONtest  = TRUE,
+      NbDistribution  = 1000,             # consider 5000+ for final reports
+      SignifThreshold = 0.05,
+      data = harm
+    )
+
+    # Global test p
+    gt <- tryCatch(pr$`Main MR results`$`Global Test`$Pvalue, error = function(e) NA_real_)
+    # Outliers
+    ot <- tryCatch(pr$`Outlier Test`, error = function(e) NULL)
+    n_out <- if (!is.null(ot) && is.data.frame(ot)) nrow(ot) else 0L
+    # Distortion test p
+    dp <- tryCatch(pr$`Distortion Test`$Pvalue, error = function(e) NA_real_)
+
+    presso_summary <- tibble(
+      GlobalTest_P = suppressWarnings(as.numeric(gt)),
+      NbOutliers   = as.integer(n_out),
+      Distortion_P = suppressWarnings(as.numeric(dp))
+    )
+
+    # PRESSO-adjusted causal estimate (beta → OR)
+    est <- tryCatch(pr$`Main MR results`$`Causal Estimate`, error = function(e) NA_real_)
+    se  <- tryCatch(pr$`Main MR results`$Sd,                error = function(e) NA_real_)
+    pv  <- tryCatch(pr$`Main MR results`$Pvalue,            error = function(e) NA_real_)
+
+    if (is.finite(est)[1] && is.finite(se)[1] && is.finite(pv)[1]) {
+      b <- as.numeric(est)[1]
+      s <- as.numeric(se)[1]
+      p <- as.numeric(pv)[1]
+      presso_adj <- tibble(
+        IVW_OR_PressoAdj    = exp(b),
+        IVW_CI_L_PressoAdj  = exp(b + qnorm(0.025)*s),
+        IVW_CI_U_PressoAdj  = exp(b + qnorm(0.975)*s),
+        IVW_P_PressoAdj     = p
+      )
+    }
+
+    # Persist PRESSO CSVs for the HTML report
+    write.csv(presso_summary, "MR_PRESSO_Summary.csv", row.names = FALSE)
+    if (!is.null(ot) && is.data.frame(ot)) {
+      write.csv(ot, "MR_PRESSO_Outliers.csv", row.names = FALSE)
+      # Optional tiny outlier plot (placeholder)
+      try({
+        if (nrow(ot) > 0 && "SNP" %in% names(ot)) {
+          png("MR_PRESSO_Outlier_Plot.png", width = 1100, height = 700, res = 150)
+          par(mar = c(5,4,2,1))
+          plot(seq_len(nrow(ot)), rep(0, nrow(ot)), pch = 19,
+               xlab = "Outlier index", ylab = "Residual (placeholder)",
+               main = "MR-PRESSO: Outlier SNPs")
+          text(seq_len(nrow(ot)), rep(0, nrow(ot)), labels = ot$SNP, pos = 3, cex = 0.7)
+          abline(h = 0, lty = 2, col = "gray50")
+          dev.off()
+        }
+      }, silent = TRUE)
+    } else {
+      write.csv(data.frame(), "MR_PRESSO_Outliers.csv", row.names = FALSE)
+    }
+  } else {
+    write.csv(presso_summary, "MR_PRESSO_Summary.csv", row.names = FALSE)
+    write.csv(data.frame(),    "MR_PRESSO_Outliers.csv", row.names = FALSE)
+  }
+}, silent = TRUE)
+
+# if PRESSO summary wasn't written (e.g., error), ensure files exist
+if (!file.exists("MR_PRESSO_Summary.csv")) {
+  write.csv(presso_summary, "MR_PRESSO_Summary.csv", row.names = FALSE)
+}
+if (!file.exists("MR_PRESSO_Outliers.csv")) {
+  write.csv(data.frame(), "MR_PRESSO_Outliers.csv", row.names = FALSE)
+}
+
+# ---- Merge PRESSO into main summary (safe if NA) ----
+results <- results %>%
+  mutate(
+    PRESSO_Global_P    = presso_summary$GlobalTest_P[1],
+    PRESSO_N_Outliers  = presso_summary$NbOutliers[1],
+    PRESSO_Distort_P   = presso_summary$Distortion_P[1],
+    IVW_OR_PressoAdj   = presso_adj$IVW_OR_PressoAdj[1],
+    IVW_CI_L_PressoAdj = presso_adj$IVW_CI_L_PressoAdj[1],
+    IVW_CI_U_PressoAdj = presso_adj$IVW_CI_U_PressoAdj[1],
+    IVW_P_PressoAdj    = presso_adj$IVW_P_PressoAdj[1],
+    PRESSO_Distort_Pct = {
+      adj <- presso_adj$IVW_OR_PressoAdj[1]
+      base <- IVW_OR[1]
+      if (is.na(adj) || is.na(base) || base == 0) NA_real_ else 100 * (adj - base) / base
+    }
+  )
+
+# ---- Write outputs ----
 write.csv(results, "MR_Formatted_Results.csv", row.names = FALSE)
 
 cat("✅ MR analysis completed successfully!\n")
 cat("📝 Outputs:\n")
-cat("- exposure_dat.csv\n- outcome_dat.csv\n- harmonised_data.csv\n- MR_Formatted_Results.csv\n- MR_IVW_OR_Per_SNP.csv\n")
+cat("- exposure_dat.csv\n- outcome_dat.csv\n- harmonised_data.csv\n")
+cat("- MR_Formatted_Results.csv (includes PRESSO)\n- MR_IVW_OR_Per_SNP.csv\n")
+cat("- MR_PRESSO_Summary.csv\n- MR_PRESSO_Outliers.csv\n")
 cat("==============================================================\n\n")
