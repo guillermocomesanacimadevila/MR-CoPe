@@ -58,36 +58,6 @@
     .num{text-align:right}
     .muted{color:var(--muted)}
 
-    /* DataTables theme integration */
-    table.dataTable,
-    table.dataTable thead th,
-    table.dataTable tbody td,
-    table.dataTable tfoot th {
-      background: var(--card-bg) !important;
-      color: var(--text) !important;
-    }
-    table.dataTable thead th,
-    table.dataTable tbody td,
-    table.dataTable tfoot th {
-      border-bottom: 1px solid var(--border) !important;
-    }
-    table.dataTable thead th { border-bottom: 2px solid var(--border) !important; }
-    .dataTables_wrapper .dt-buttons .dt-button{
-      background:var(--card-bg) !important; color:var(--accent) !important;
-      border:1px solid var(--border) !important; border-radius:10px !important; padding:.35rem .6rem !important;
-    }
-    .dataTables_wrapper .dataTables_filter input{
-      background:var(--card-bg) !important; color:var(--text) !important;
-      border:1px solid var(--border) !important; border-radius:8px !important; padding:.35rem .5rem !important;
-    }
-    .dataTables_wrapper .dataTables_paginate .paginate_button{
-      color:var(--text) !important; border:1px solid var(--border) !important;
-      background:var(--card-bg) !important; border-radius:8px !important; margin:0 2px !important;
-    }
-    .dataTables_wrapper .dataTables_paginate .paginate_button.current{
-      background:var(--bg) !important; color:var(--table-head) !important; border-color:var(--border) !important;
-    }
-
     .footer{margin-top:28px;text-align:center;color:var(--muted);font-size:.95rem}
     .theme{position:fixed;right:18px;top:14px;border:1px solid var(--border);background:var(--card-bg);color:var(--accent);border-radius:12px;padding:.48rem .7rem;cursor:pointer;box-shadow:var(--shadow)}
     ::selection{background:var(--accent);color:#fff}
@@ -125,19 +95,20 @@
           </thead>
           <tbody>
             <tr><td>IVW</td><td class="num"><!-- IVW_OR --></td><td class="nowrap"><!-- IVW_CI --></td><td class="num"><!-- IVW_P --></td><td class="num"><!-- IVW_Q --></td><td class="num"><!-- IVW_QP --></td><td class="num"><!-- IVW_I2 --></td><td class="muted">—</td></tr>
-            <tr><td>Weighted median</td><td class="num"><!-- WME_OR --></td><td class="nowrap"><!-- WME_CI --></td><td class="num"><!-- WME_P --></td><td class="muted">—</td><td class="muted">—</td><td class="num"><!-- WME_I2 --></td><td class="muted">—</td></tr>
+            <tr><td>Weighted median</td><td class="num"><!-- WME_OR --></td><td class="nowrap"><!-- WME_CI --></td><td class="num"><!-- WME_P --></td><td class="muted">—</td><td class="muted">—</td><td class="num">—</td><td class="muted">—</td></tr>
             <tr><td>MR Egger</td><td class="num"><!-- EGGER_OR --></td><td class="nowrap"><!-- EGGER_CI --></td><td class="num"><!-- EGGER_P --></td><td class="num"><!-- EGGER_Q --></td><td class="num"><!-- EGGER_QP --></td><td class="num"><!-- EGGER_I2 --></td><td class="num"><!-- EGGER_INT_P --></td></tr>
           </tbody>
         </table>
       </div>
     </div>
 
-    <!-- Tabs: SNPs / Figures / Methods / Downloads -->
+    <!-- Tabs: SNPs / Figures / Methods / MR-PRESSO / Downloads -->
     <div class="tabbed section">
       <div class="tabs">
         <button class="tab active" data-tab="t1"><i class="fa-solid fa-dna"></i> SNP table</button>
         <button class="tab" data-tab="t4"><i class="fa-solid fa-images"></i> Static figures</button>
         <button class="tab" data-tab="t5"><i class="fa-solid fa-table"></i> Method summary</button>
+        <button class="tab" data-tab="t7"><i class="fa-solid fa-wand-magic-sparkles"></i> MR-PRESSO</button>
         <button class="tab" data-tab="t6"><i class="fa-solid fa-download"></i> Downloads</button>
       </div>
 
@@ -145,7 +116,7 @@
       <div id="t1" class="tab-content active">
         <div class="section-header">
           <h2>📊 SNP summary (harmonised)</h2>
-          <span class="pill">alleles • betas • SE • p • EAF • IVW OR</span>
+          <span class="pill">alleles • betas • SE • p • EAF • F • IVW OR</span>
         </div>
         <div class="table-wrap">
           <table id="snpTable" class="display nowrap compact" style="width:100%">
@@ -166,6 +137,7 @@
                 <th>P Out</th>
                 <th>EAF Exp</th>
                 <th>EAF Out</th>
+                <th>F</th>
                 <th>IVW OR</th>
                 <th>95% CI (IVW)</th>
               </tr>
@@ -190,6 +162,9 @@
           <div class="fig"><h4>Outcome Manhattan</h4><img id="img_man_out" alt="outcome_manhattan"/></div>
           <div class="fig"><h4>Exposure Q-Q</h4><img id="img_qq_exp" alt="exposure_qq"/></div>
           <div class="fig"><h4>Outcome Q-Q</h4><img id="img_qq_out" alt="outcome_qq"/></div>
+          <div class="fig"><h4>F-statistics Histogram</h4><img id="img_fstat_hist" alt="Fstat_Histogram"/></div>
+          <div class="fig"><h4>F-statistics Density</h4><img id="img_fstat_density" alt="Fstat_Density"/></div>
+          <div class="fig"><h4>Funnel Plot</h4><img id="img_funnel" alt="Funnel_Plot"/></div>
         </div>
       </div>
 
@@ -206,6 +181,43 @@
         </div>
       </div>
 
+      <!-- t7: MR-PRESSO -->
+      <div id="t7" class="tab-content">
+        <div class="section-header">
+          <h2>🪄 MR-PRESSO</h2>
+          <span class="pill">global pleiotropy • outliers • distortion • adjusted IVW</span>
+        </div>
+
+        <!-- Summary cards -->
+        <div class="grid-kpi" style="margin-top:0">
+          <div class="kpi"><h3>Global test (p)</h3><div class="val"><!-- PRESSO_GLOBAL_P --></div></div>
+          <div class="kpi"><h3># Outliers</h3><div class="val"><!-- PRESSO_N_OUT --></div></div>
+          <div class="kpi"><h3>Distortion (p)</h3><div class="val"><!-- PRESSO_DIST_P --></div></div>
+          <div class="kpi"><h3>IVW (PRESSO-adj)</h3>
+            <div class="val"><!-- PRESSO_IVW_OR --> <span class="pill"><!-- PRESSO_IVW_CI --></span></div>
+            <div class="muted" style="margin-top:6px">p = <!-- PRESSO_IVW_P --> &nbsp;|&nbsp; Δ vs IVW = <!-- PRESSO_DELTA --></div>
+          </div>
+        </div>
+
+        <!-- Optional plot -->
+        <div class="fig-grid" style="margin-top:10px">
+          <div class="fig"><h4>Outlier overview</h4><img id="img_presso_plot" alt="MR_PRESSO_Outlier_Plot"/></div>
+        </div>
+
+        <!-- Outliers table -->
+        <div class="section" style="margin-top:14px">
+          <div class="section-header"><h2>🚩 Outlier SNPs</h2><span class="pill">from MR-PRESSO outlier test</span></div>
+          <div class="table-wrap">
+            <table id="pressoTable" class="display nowrap compact" style="width:100%">
+              <thead>
+                <tr><th>SNP</th><th>RSSobs</th><th>p-value</th></tr>
+              </thead>
+              <tbody><!-- PRESSO_OUTLIER_ROWS --></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <!-- t6: downloads -->
       <div id="t6" class="tab-content">
         <div class="section-header"><h2>⬇️ Downloads</h2><span class="pill">CSV exports</span></div>
@@ -213,6 +225,8 @@
           <a href="MR_Formatted_Results.csv" download class="pill">MR_Formatted_Results.csv</a>
           <a href="MR_IVW_OR_Per_SNP.csv" download class="pill">MR_IVW_OR_Per_SNP.csv</a>
           <a href="harmonised_data.csv" download class="pill">harmonised_data.csv</a>
+          <a href="mr_presso_summary.csv" download class="pill">mr_presso_summary.csv</a>
+          <a href="mr_presso_outliers.csv" download class="pill">mr_presso_outliers.csv</a>
         </p>
       </div>
     </div>
@@ -230,7 +244,6 @@
   <script>
     // Date
     document.getElementById("today").textContent = new Date().toLocaleDateString();
-
     function adjustTables(){ setTimeout(()=>{$($.fn.dataTable.tables(true)).DataTable().columns.adjust();},0); }
 
     // Theme
@@ -266,12 +279,11 @@
         autoWidth:false,
         deferRender:true,
         scrollX:true,
-        // NOTE: scroller removed to avoid giant blank space for small tables
         paging:true, pageLength:25,
         lengthMenu:[[10,25,50,100,-1],[10,25,50,100,'All']],
         language:{search:"🔎 Search SNPs:"},
         columnDefs:[
-          {targets:[1,2,13,14,15], className:'num'},
+          {targets:[1,2,7,8,9,10,11,12,13,14,15,16], className:'num'},
           {targets:'_all', className:'nowrap'}
         ]
       });
@@ -285,11 +297,19 @@
         scrollX:true, paging:false, searching:false, info:false,
         columnDefs:[{targets:[1,2,3,4,5,6], className:'num'}]
       });
+
+      // PRESSO outliers table
+      $('#pressoTable').DataTable({
+        autoWidth:false,
+        scrollX:true, paging:false, searching:false, info:false,
+        columnDefs:[{targets:[1,2], className:'num'}]
+      });
+
       adjustTables();
       window.addEventListener('resize', adjustTables);
     });
 
-    /* Static figure src (file paths injected by 07_generate_html_report.py) */
+    // Static figure src (file paths injected by 07_generate_html_report.py)
     const IMG = {
       scatterCombined: '<!-- SCATTER_COMBINED_SRC -->',
       leaveOneOut:     '<!-- LOO_SRC -->',
@@ -298,7 +318,10 @@
       manExp:          '<!-- MANHATTAN_EXPOSURE_SRC -->',
       manOut:          '<!-- MANHATTAN_OUTCOME_SRC -->',
       qqExp:           '<!-- QQ_EXPOSURE_SRC -->',
-      qqOut:           '<!-- QQ_OUTCOME_SRC -->'
+      qqOut:           '<!-- QQ_OUTCOME_SRC -->',
+      fstatHist:       '<!-- FSTAT_HIST_SRC -->',
+      fstatDensity:    '<!-- FSTAT_DENSITY_SRC -->',
+      funnelPlot:      '<!-- FUNNEL_SRC -->'
     };
     function setImg(id, src, title){
       const el=document.getElementById(id);
@@ -313,6 +336,17 @@
     setImg('img_man_out',          IMG.manOut,          'outcome_manhattan.png');
     setImg('img_qq_exp',           IMG.qqExp,           'exposure_qq.png');
     setImg('img_qq_out',           IMG.qqOut,           'outcome_qq.png');
+    setImg('img_fstat_hist',       IMG.fstatHist,       'Fstat_Histogram.png');
+    setImg('img_fstat_density',    IMG.fstatDensity,    'Fstat_Density.png');
+    setImg('img_funnel',           IMG.funnelPlot,      'Funnel_Plot.png');
+
+    // PRESSO plot (optional)
+    (function(){
+      const src = '<!-- PRESSO_PLOT_SRC -->';
+      const el = document.getElementById('img_presso_plot');
+      if(src && src.length){ el.src = src; el.alt = 'mr_presso_outlier_plot.png'; }
+      else { el.parentElement.innerHTML = `<div class="fig" style="padding:12px;border:1px dashed var(--border);border-radius:12px;color:#999;text-align:center;">PRESSO outlier plot (missing)</div>`; }
+    })();
   </script>
 </body>
 </html>
