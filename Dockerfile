@@ -48,14 +48,24 @@ RUN Rscript -e "install.packages('tidyverse', repos='https://cloud.r-project.org
     Rscript -e "stopifnot('tidyverse' %in% rownames(installed.packages()))"
 
 # -----------------------------
-# Install TwoSampleMR & ieugwasr from r-universe (official, recommended)
+# Install TwoSampleMR & ieugwasr from r-universe (official)
 # -----------------------------
 RUN Rscript -e "install.packages(c('TwoSampleMR', 'ieugwasr'), repos = c('https://mrcieu.r-universe.dev', 'https://cloud.r-project.org'))"
 
 # -----------------------------
-# Install phenoscanner (from GitHub, requires devtools)
+# Install phenoscanner (GitHub)
 # -----------------------------
 RUN Rscript -e "devtools::install_github('phenoscanner/phenoscanner')"
+
+# -----------------------------
+# Install MR-PRESSO + common deps
+# -----------------------------
+# (metafor/boot/foreach/doParallel are useful deps pressed by MRPRESSO;
+# ggplot2 is already provided via tidyverse.)
+RUN Rscript -e "install.packages(c('metafor','boot','foreach','doParallel'), repos='https://cloud.r-project.org', dependencies=TRUE)" && \
+    Rscript -e "remotes::install_github('rondolab/MR-PRESSO', upgrade='never')" && \
+    Rscript -e "stopifnot('MRPRESSO' %in% rownames(installed.packages()))" && \
+    Rscript -e "library(MRPRESSO); sessionInfo()"
 
 # -----------------------------
 # Set working directory
