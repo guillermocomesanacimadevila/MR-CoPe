@@ -373,80 +373,187 @@ if [[ "$INPUT_TYPE" == "vcf" ]]; then
   echo "🔄 Parsing VCF: $EXPOSURE_VCF → ./tmp_exposure.csv"
   python3 - <<'EOF'
 import gzip, csv, sys, os
+
 vcf_path = os.environ.get("EXPOSURE_VCF")
 csv_path = "./tmp_exposure.csv"
 is_log10 = (os.environ.get("LOG10_INPUT","n").lower() == "y")
-def parse_sample_field(field):
-    es, se, lp, af, rsid = field.split(":")
+
+def parse_info_af(info):
     try:
-        pval = 10 ** (-float(lp)) if is_log10 else float(lp)
+        for kv in info.split(";"):
+            if kv.startswith("AF="):
+                return float(kv.split("=",1)[1])
     except Exception:
-        pval = None
-    return {"BETA": float(es), "SE": float(se), "PVALUE": pval, "EAF": float(af), "SNP": rsid}
-open_vcf = gzip.open if vcf_path.endswith('.gz') else open
-with (open_vcf(vcf_path, 'rt')) as vcf_in, open(csv_path, 'w', newline='') as csv_out:
-    writer = None; rows = 0
-    for line in vcf_in:
-        if line.startswith("##"): continue
-        if line.startswith("#CHROM"):
-            header = line.strip().lstrip("#").split("\t")
-            format_col = header.index("FORMAT")
-            sample_col = format_col + 1
-            writer = csv.DictWriter(csv_out, fieldnames=["SNP","CHR","BP","A1","A2","BETA","SE","PVALUE","EAF"])
-            writer.writeheader(); continue
-        fields = line.strip().split("\t")
-        if len(fields) <= sample_col: continue
-        chrom, pos, snp_id, ref, alt = fields[0], fields[1], fields[2], fields[3], fields[4]
+        pass
+    return None
+
+def to_p(lp=None, p=None):
+    if lp is not None and lp not in ("", "."):
         try:
-            stats = parse_sample_field(fields[sample_col])
-            writer.writerow({"SNP": stats["SNP"], "CHR": chrom, "BP": pos, "A1": alt, "A2": ref,
-                             "BETA": stats["BETA"], "SE": stats["SE"], "PVALUE": stats["PVALUE"], "EAF": stats["EAF"]})
-            rows += 1
-        except Exception as e:
-            print(f"⚠️ Skipping line at position {pos}: {e}", file=sys.stderr)
-    print(rows, file=sys.stderr)
+            x = float(lp)
+            return 10.0**(-x) if is_log10 else x
+        except Exception:
+            return None
+    if p is not None and p not in ("", "."):
+        try:
+            return float(p)
+        except Exception:
+            return None
+    return None
+
+open_vcf = gzip.open if vcf_path.endswith('.gz') else open
+
+with (open_vcf(vcf_path, 'rt')) as vcf_in, open(csv_path, 'w', newline='') as csv_out:
+    writer = csv.DictWriter(csv_out, fieldnames=["SNP","CHR","BP","A1","A2","BETA","SE","PVALUE","EAF"])
+    writer.writeheader()
+    written = 0
+    for line in vcf_in:
+        if not line or line.startswith("#"):
+            continue
+        fields = line.rstrip("\n").split("\t")
+        if len(fields) < 10:
+            continue
+        chrom, pos, vcf_id, ref, alt, qual, flt, info, fmt, sample = fields[:10]
+        # handle multiallelic by taking first ALT for consistency
+        alt = alt.split(",")[0]
+
+        fmt_keys = fmt.split(":")
+        fmt_vals = sample.split(":")
+        kv = {k:v for k, v in zip(fmt_keys, fmt_vals)}
+
+        es  = kv.get("ES")
+        se  = kv.get("SE")
+        lp  = kv.get("LP")  # may be -log10(p) or raw p depending on flag
+        p   = kv.get("P")   # some formats provide raw P directly
+        af  = kv.get("AF")
+        rs  = kv.get("ID") if kv.get("ID") not in (None, "", ".") else (vcf_id if vcf_id != "." else None)
+        if rs in (None, "", "."):
+            rs = f"{chrom}:{pos}:{ref}:{alt}"
+
+        if af in (None, "", "."):
+            af = parse_info_af(info)
+
+        try:
+            beta = float(es) if es not in (None, "", ".") else None
+            se_v = float(se) if se not in (None, "", ".") else None
+            af_v = float(af) if (af is not None and af not in ("", ".")) else None
+        except Exception:
+            beta = se_v = af_v = None
+
+        pval = to_p(lp, p)
+
+        if beta is None or se_v is None or pval is None:
+            continue
+
+        writer.writerow({
+            "SNP": rs,
+            "CHR": chrom,
+            "BP": pos,
+            "A1": alt,  # effect allele (ALT)
+            "A2": ref,  # other allele  (REF)
+            "BETA": beta,
+            "SE": se_v,
+            "PVALUE": pval,
+            "EAF": af_v
+        })
+        written += 1
+
+print(written, file=sys.stderr)
 EOF
   NROWS=$(awk 'END{print NR-1}' ./tmp_exposure.csv)
-  append_filter_summary "vcf_parse_exposure" "./tmp_exposure.csv" "$NROWS" "NA" "VCF→CSV conversion"
+  append_filter_summary "vcf_parse_exposure" "./tmp_exposure.csv" "$NROWS" "NA" "VCF→CSV conversion (robust)"
 
   echo "🔄 Parsing VCF: $OUTCOME_VCF → ./tmp_outcome.csv"
   python3 - <<'EOF'
 import gzip, csv, sys, os
+
 vcf_path = os.environ.get("OUTCOME_VCF")
 csv_path = "./tmp_outcome.csv"
 is_log10 = (os.environ.get("LOG10_INPUT","n").lower() == "y")
-def parse_sample_field(field):
-    es, se, lp, af, rsid = field.split(":")
+
+def parse_info_af(info):
     try:
-        pval = 10 ** (-float(lp)) if is_log10 else float(lp)
+        for kv in info.split(";"):
+            if kv.startswith("AF="):
+                return float(kv.split("=",1)[1])
     except Exception:
-        pval = None
-    return {"BETA": float(es), "SE": float(se), "PVALUE": pval, "EAF": float(af), "SNP": rsid}
-open_vcf = gzip.open if vcf_path.endswith('.gz') else open
-with (open_vcf(vcf_path, 'rt')) as vcf_in, open(csv_path, 'w', newline='') as csv_out:
-    writer = None; rows = 0
-    for line in vcf_in:
-        if line.startswith("##"): continue
-        if line.startswith("#CHROM"):
-            header = line.strip().lstrip("#").split("\t")
-            format_col = header.index("FORMAT")
-            sample_col = format_col + 1
-            writer = csv.DictWriter(csv_out, fieldnames=["SNP","CHR","BP","A1","A2","BETA","SE","PVALUE","EAF"])
-            writer.writeheader(); continue
-        fields = line.strip().split("\t")
-        if len(fields) <= sample_col: continue
-        chrom, pos, snp_id, ref, alt = fields[0], fields[1], fields[2], fields[3], fields[4]
+        pass
+    return None
+
+def to_p(lp=None, p=None):
+    if lp is not None and lp not in ("", "."):
         try:
-            stats = parse_sample_field(fields[sample_col])
-            writer.writerow({"SNP": stats["SNP"], "CHR": chrom, "BP": pos, "A1": alt, "A2": ref,
-                             "BETA": stats["BETA"], "SE": stats["SE"], "PVALUE": stats["PVALUE"], "EAF": stats["EAF"]})
-            rows += 1
-        except Exception as e:
-          print(f"⚠️ Skipping line at position {pos}: {e}", file=sys.stderr)
-    print(rows, file=sys.stderr)
+            x = float(lp)
+            return 10.0**(-x) if is_log10 else x
+        except Exception:
+            return None
+    if p is not None and p not in ("", "."):
+        try:
+            return float(p)
+        except Exception:
+            return None
+    return None
+
+open_vcf = gzip.open if vcf_path.endswith('.gz') else open
+
+with (open_vcf(vcf_path, 'rt')) as vcf_in, open(csv_path, 'w', newline='') as csv_out:
+    writer = csv.DictWriter(csv_out, fieldnames=["SNP","CHR","BP","A1","A2","BETA","SE","PVALUE","EAF"])
+    writer.writeheader()
+    written = 0
+    for line in vcf_in:
+        if not line or line.startswith("#"):
+            continue
+        fields = line.rstrip("\n").split("\t")
+        if len(fields) < 10:
+            continue
+        chrom, pos, vcf_id, ref, alt, qual, flt, info, fmt, sample = fields[:10]
+        alt = alt.split(",")[0]
+
+        fmt_keys = fmt.split(":")
+        fmt_vals = sample.split(":")
+        kv = {k:v for k, v in zip(fmt_keys, fmt_vals)}
+
+        es  = kv.get("ES")
+        se  = kv.get("SE")
+        lp  = kv.get("LP")
+        p   = kv.get("P")
+        af  = kv.get("AF")
+        rs  = kv.get("ID") if kv.get("ID") not in (None, "", ".") else (vcf_id if vcf_id != "." else None)
+        if rs in (None, "", "."):
+            rs = f"{chrom}:{pos}:{ref}:{alt}"
+
+        if af in (None, "", "."):
+            af = parse_info_af(info)
+
+        try:
+            beta = float(es) if es not in (None, "", ".") else None
+            se_v = float(se) if se not in (None, "", ".") else None
+            af_v = float(af) if (af is not None and af not in ("", ".")) else None
+        except Exception:
+            beta = se_v = af_v = None
+
+        pval = to_p(lp, p)
+
+        if beta is None or se_v is None or pval is None:
+            continue
+
+        writer.writerow({
+            "SNP": rs,
+            "CHR": chrom,
+            "BP": pos,
+            "A1": alt,
+            "A2": ref,
+            "BETA": beta,
+            "SE": se_v,
+            "PVALUE": pval,
+            "EAF": af_v
+        })
+        written += 1
+
+print(written, file=sys.stderr)
 EOF
   NROWS=$(awk 'END{print NR-1}' ./tmp_outcome.csv)
-  append_filter_summary "vcf_parse_outcome" "./tmp_outcome.csv" "$NROWS" "NA" "VCF→CSV conversion"
+  append_filter_summary "vcf_parse_outcome" "./tmp_outcome.csv" "$NROWS" "NA" "VCF→CSV conversion (robust)"
 
   EXPOSURE_PATH="./tmp_exposure.csv"
   OUTCOME_PATH="./tmp_outcome.csv"
@@ -472,6 +579,69 @@ else
   read -rp "🧪 Are the p-values in your input files already -log10(p)? [y/n]: " LOG10_FLAG
   LOG10_FLAG=$(echo "$LOG10_FLAG" | tr '[:upper:]' '[:lower:]')
   append_param_log "log10_flag" "$LOG10_FLAG"
+
+  # --- If -log10(p) provided, convert to raw p but keep headers/order intact ---
+  if [[ "$LOG10_FLAG" == "y" ]]; then
+    echo "🔄 Converting -log10(p) → p for exposure/outcome tables (headers/order preserved)..."
+
+    EXPOSURE_NORM="./tmp_exposure_norm.csv"
+    OUTCOME_NORM="./tmp_outcome_norm.csv"
+    export EXPOSURE_IN="$EXPOSURE_PATH" OUTCOME_IN="$OUTCOME_PATH"
+    export EXPOSURE_NORM OUTCOME_NORM
+
+    python3 - <<'PY'
+import os, sys, pandas as pd, csv
+
+def sniff_delim(path, default=','):
+    ext = os.path.splitext(path.lower())[1]
+    if ext == '.tsv': return '\t'
+    if ext == '.csv': return ','
+    try:
+        with open(path, 'r', newline='') as f:
+            sample = f.read(2048)
+        dialect = csv.Sniffer().sniff(sample, delimiters=[',','\t',';','|'])
+        return dialect.delimiter
+    except Exception:
+        return default
+
+def convert_log10p_file(inp, outp):
+    sep_in = sniff_delim(inp, ',')
+    df = pd.read_csv(inp, sep=sep_in, dtype=str)
+    cols = list(df.columns)  # preserve original order
+    candidates = {
+        'p','pval','pvalue','p_value','p.value','pv',
+        'p_out','p_exp','pval_out','pval_exp','pvalue_out','pvalue_exp',
+        'p_outcome','p_exposure'
+    }
+    lowmap = {c.lower(): c for c in cols}
+    targets = [lowmap[c] for c in lowmap if c in candidates]
+
+    if not targets:
+        # No obvious p column — pass through unchanged (but emit CSV for pipeline)
+        df.to_csv(outp, index=False, sep=',')
+        print(f"⚠️  No p-value column detected in {os.path.basename(inp)}; wrote unchanged.", file=sys.stderr)
+        return
+
+    for col in targets:
+        num = pd.to_numeric(df[col], errors='coerce')
+        df[col] = (10.0 ** (-num)).where(num.notna(), df[col])
+
+    # Write CSV (pipeline expects CSV)
+    df.to_csv(outp, index=False, sep=',')
+
+convert_log10p_file(os.environ['EXPOSURE_IN'], os.environ['EXPOSURE_NORM'])
+convert_log10p_file(os.environ['OUTCOME_IN'],  os.environ['OUTCOME_NORM'])
+PY
+
+    # Point pipeline to normalized CSVs
+    EXPOSURE_PATH="$EXPOSURE_NORM"
+    OUTCOME_PATH="$OUTCOME_NORM"
+
+    XN=$(awk 'END{print NR-1}' "$EXPOSURE_PATH" 2>/dev/null || echo 0)
+    YN=$(awk 'END{print NR-1}' "$OUTCOME_PATH"  2>/dev/null || echo 0)
+    append_filter_summary "log10_to_p_exposure" "$EXPOSURE_PATH" "$XN" "NA" "Converted -log10(p) → p (headers preserved)"
+    append_filter_summary "log10_to_p_outcome"  "$OUTCOME_PATH"  "$YN" "NA" "Converted -log10(p) → p (headers preserved)"
+  fi
 fi
 
 # ------------------------ LD Clumping Settings ------------------------
