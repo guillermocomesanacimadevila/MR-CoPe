@@ -1,10 +1,15 @@
-# Force GitHub to recognize .nf files as Nextflow
 *.nf linguist-language=Nextflow
 
-# Ensure Dockerfile is highlighted properly
 Dockerfile linguist-language=Dockerfile
 
-# Force recognition of .sql files
 *.sql linguist-detectable=true
 *.sql linguist-language=SQL
-*.sql text
+
+*.R linguist-language=R
+*.R linguist-detectable=true
+
+*.py linguist-language=Python
+*.ipynb linguist-language=Python
+
+tests/* linguist-vendored
+scripts/* linguist-vendored
